@@ -1,0 +1,30 @@
+pydantic
+numpy & json
+Qwen/Qwen3-0.6B
+
+
+
+uv run python -m src [--functions_definition <function_definition_file>] [--input <input_file>] [--
+output <output_file>]
+
+
+
+Par défaut, le programme lit les fichiers d'entrée dans le répertoire data/input/
+et enregistre les fichiers de sortie dans le répertoire data/output/. Vous
+pouvez, si vous le souhaitez, spécifier des chemins d'accès personnalisés à l'aide des arguments --input et --output
+. Par exemple :
+uv run python -m src
+--functions_definition data/input/functions_definition.json
+--input data/input/function_calling_tests.json
+--output data/output/function_calls.json
+
+
+V.4.2 Règles de validation
+• Le fichier doit être au format JSON valide (pas de virgules à la fin, pas de commentaires)
+• Les clés et les types doivent correspondre exactement au schéma défini dans le fichier functions_definition.json
+• Aucune clé supplémentaire ni aucun texte n'est autorisé dans la sortie
+• Tous les arguments obligatoires doivent être présents
+• Les types des arguments doivent correspondre à la définition de la fonction (nombre, chaîne de caractères, booléen, etc.)
+Les fichiers d'entrée fournis peuvent changer au cours de l'évaluation par les pairs. Ne
+codez pas en dur vos solutions en vous basant sur les exemples fournis.
+
