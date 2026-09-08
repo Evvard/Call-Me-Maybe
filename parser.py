@@ -25,21 +25,26 @@ def parsing_function() -> str | None:
         return None
 
 
-def dictionary_creation(object: str) -> Dict[str, str] | None:
-    try:
-        prompt = ""
-        sep = 0
-        for i in object:
-            if i in ("\'" or "\""):
-                print("test")
-                sep += 1
-            if sep == 3:
-                prompt += i
-        prompt.strip("}")
-        return {'prompt': prompt}
-    except Exception as m:
-        print(m)
-        return None
+def dictionary_creation(obj: str) -> Dict[str, str] | None:
+    word = ""
+    prompt = {}
+    start = 0
+    count = 0
+    for i in obj:
+        if i == "{":
+            start += 1
+        if start == 1 and i == ("\"" or "\'"):
+            count += 1
+        if start == 1 and count == 3 and i != "}":
+            word += i
+        if i == "}":
+            start = 0
+            count = 0
+            prompt.add({'prompt': word})
+            word = ""
+    return dict(prompt)
+
+
 
 
 if __name__ == "__main__":
@@ -48,8 +53,6 @@ if __name__ == "__main__":
 
     function = parsing_function()
 
-    for i in prompte:
-        print(i)
-        prompt.update(dictionary_creation(i))
-        
+    prompt.update(dictionary_creation(prompte))
+
     print(prompt)
