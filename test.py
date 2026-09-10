@@ -8,5 +8,7 @@ def speak_with_llm(prompt):
     print("Input IDs:", input_ids)
     print()
 
+    logits = llm.get_logits_from_input_ids([123, 456])
+    print(logits)
 
 speak_with_llm("What the sum of 2 and 3")

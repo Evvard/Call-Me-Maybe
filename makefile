@@ -1,8 +1,8 @@
 PACKAGE_NAME = call_me_maybe
 
 install:
-	uv pip install flake8 mypy
-	uv pip install numpy pydantic
+	uv pip install flake8 mypy torch huggingface-hub
+	uv pip install numpy pydantic transformers
 run:
 	python3 
 
