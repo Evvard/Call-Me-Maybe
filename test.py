@@ -1,4 +1,6 @@
 from llm_sdk.llm_sdk import Small_LLM_Model
+import numpy as np
+import json
 
 
 def speak_with_llm(prompt):
@@ -15,7 +17,7 @@ def speak_with_llm(prompt):
     print()
 
     vocab_path = llm.get_path_to_vocab_file()
-    import json
+
     with open(vocab_path) as f:
         vocab = json.load(f)
     print("Token shearch :", vocab["{"])
@@ -32,21 +34,33 @@ def speak_with_llm(prompt):
     prompt = "Reverse the string 'hello'"
     inputs_ids = llm.encode(prompt).tolist()[0]
     logit = llm.get_logits_from_input_ids(inputs_ids)
+
+    forbidden_token_id = logit.index(max(logit))
+    print(f"Token banni temporairement: '{llm.decode(forbidden_token_id)}' (ID: {forbidden_token_id})")
+
+    logit[forbidden_token_id] = float('-inf')
+    logit["{"] = float('+inf')
+
+    next_token_id = logit.index(max(logit))
+    print("Nouveau Pro Token après masquage: ", llm.decode(next_token_id))
+    print()
+
+
+""" 
     next_token_id = logit.index(max(logit))
     print("Pro Token: ", llm.decode(next_token_id))
-    if next_token_id in json_tokens:
-        print(next_token_id)
-    else:
+    print()
+
+    first = vocab["{"]
+    input_ids = llm.encode(prompt).tolist()[0]
+    input_ids.append(first)
+    print(input_ids)
 
 
+    next_logits = llm.get_logits_from_input_ids(input_ids)
+    print(llm.decode((max(next_logits))))
 
-https://numpy.org/learn/
-
-
-
-
-
-
+"""
 
 
 
