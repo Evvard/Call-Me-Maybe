@@ -14,16 +14,27 @@ def tchat_llm(prompt):
     for i in json_voc:
         print(f"Char shearch {i} -> id {vocab[i]}")
 
-    input_id = qwen.encode(prompt).tolist()[0]
+    '''Token de fin + enlever le None de eos_token'''
+    eos_tokens = {vocab.get("<|im_end|>"), vocab.get("<|endoftext|>")}
+    eos_tokens.discard(None)
+
+    '''Pour que le modele reponde a ma question'''
+    formated = f"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
+
+    input_id = qwen.encode(formated).tolist()[0]
     print(f"\nInput id de [Prompt] : {input_id}\n")
 
-    logit = qwen.get_logits_from_input_ids(input_id)
-    next_token = logit.index(max(logit))
-    print(f"Next Token logit : {next_token} = {qwen.decode(next_token)}")
+    #logit = qwen.get_logits_from_input_ids(input_id)
+    #next_token = logit.index(max(logit))
+    #print(f"Next Token logit : {next_token} = {qwen.decode(next_token)}")
 
-    for _ in range(100):
+    for _ in range(120):
         logit = qwen.get_logits_from_input_ids(input_id)
         next_token = logit.index(max(logit))
+
+        if next_token in eos_tokens:
+            break
+
         input_id.append(next_token)
 
     response = qwen.decode(input_id)
