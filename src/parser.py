@@ -45,7 +45,7 @@ def validation_function(path_json: str | Path) -> List[FonctionDefinition]:
         with open(path, 'r') as f:
             data = json.load(f)
         if not isinstance(data, list):
-            raise ValueError("Le fichier doit contenir une liste d'objets JSON.")
+            raise ValueError("Le fichier doit contenir une liste format JSON.")
         return [FonctionDefinition(**item) for item in data]
     except Exception as err:
         raise ValueError(f"Probbleme : {err}") from err
@@ -59,7 +59,7 @@ def load_prompts(path_json: str) -> List[PrompTest]:
         with open(path, 'r') as f:
             data = json.load(f)
         if not isinstance(data, list):
-            raise ValueError("Le fichier doit contenir une liste d'objets JSON.")
+            raise ValueError("Le fichier doit contenir une liste format JSON.")
         return [PrompTest(**item) for item in data]
     except Exception as err:
         raise ValueError(f"Probbleme : {err}") from err
@@ -69,15 +69,15 @@ def load_prompts(path_json: str) -> List[PrompTest]:
 if __name__ == "__main__":
     try:
         funcs = validation_function("data/input/functions_definition.json")
-        print(f"✅ {len(funcs)} fonctions chargées avec succès :")
+        print(f"OK {len(funcs)} fonctions chargées avec succès :")
         for fn in funcs:
-            params = [f"{name} ({detail.type})" for name, detail in fn.parameters.items()]
-            print(f"  - {fn.name}: {', '.join(params) if params else 'aucun paramètre'}")
+params = [f"{name} ({detail.type})" for name, detail in fn.parameters.items()]
+print(f"  - {fn.name}: {', '.join(params) if params else 'aucun paramètre'}")
 
         prompts = load_prompts("data/input/function_calling_tests.json")
-        print(f"\n✅ {len(prompts)} prompts de test chargés avec succès :")
+        print(f"\nOK {len(prompts)} prompts de test chargés avec succès :")
         for p in prompts[:3]:  # On affiche les 3 premiers
             print(f"  - \"{p.prompt}\"")
 
     except Exception as e:
-        print(f"❌ Erreur : {e}")"""
+        print(f"NO Erreur : {e}")"""

@@ -28,3 +28,14 @@ V.4.2 Règles de validation
 Les fichiers d'entrée fournis peuvent changer au cours de l'évaluation par les pairs. Ne
 codez pas en dur vos solutions en vous basant sur les exemples fournis.
 
+
+Prompt utilisateur
+       │
+       ▼
+[Étape 1 : Choix de la fonction] ──► Masquage des logits pour forcer un "name" valide
+       │
+       ▼
+[Étape 2 : Extraction des paramètres] ──► Guidage selon le type attendu (number ou string)
+       │
+       ▼
+Validation Pydantic finale ──► Écriture dans data/output/function_calling_results.json
