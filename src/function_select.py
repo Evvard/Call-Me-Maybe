@@ -1,15 +1,16 @@
-import json
 from typing import List, Set, Dict
 import numpy
 
 from llm_sdk.llm_sdk import Small_LLM_Model
-from parser import FonctionDefinition, validation_function
+from parser import FonctionDefinition
 
 
 '''Le Llm choisis la bonne fonction en masquant les logit + generation'''
 
 
-def select_valid_function(prompt: str, function: List[FonctionDefinition], model: Small_LLM_Model) -> str:
+def select_valid_function(prompt: str, function:
+                          List[FonctionDefinition],
+                          model: Small_LLM_Model) -> str:
     function_names: List[str] = [f.name for f in function]
     token_name: Dict[str, List[int]] = {
         name: model.encode(name).tolist()[0] for name in function_names}

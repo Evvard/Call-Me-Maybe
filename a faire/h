@@ -39,3 +39,7 @@ Prompt utilisateur
        │
        ▼
 Validation Pydantic finale ──► Écriture dans data/output/function_calling_results.json
+
+
+
+le dossier output se creer automatiquement

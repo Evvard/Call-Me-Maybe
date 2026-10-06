@@ -1,3 +1,11 @@
+import os
+from sys import argv
+
+os.mkdir("data")
+
+
+
+
 
 
 
