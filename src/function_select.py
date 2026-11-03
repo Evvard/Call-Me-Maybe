@@ -1,60 +1,55 @@
-from typing import List, Set, Dict
-import numpy
+"""Select a function using only LLM scores over valid name continuations."""
 
-from llm_sdk.llm_sdk import Small_LLM_Model
-from parser import FonctionDefinition
+import json
+
+from llm_sdk import Small_LLM_Model
+from src.fn_add_nb import choose_token
+from src.parser import FonctionDefinition
 
 
-'''Le Llm choisis la bonne fonction en masquant les logit + generation'''
+def select_valid_function(
+    prompt: str, functions: list[FonctionDefinition], model: Small_LLM_Model,
+) -> tuple[str, list[int]]:
+    """Constrain generation to complete, JSON-quoted available names.
 
+    Args:
+        prompt: Natural-language request to dispatch without heuristics.
+        functions: Validated definitions supplied by the input file.
+        model: SDK instance providing encoding and next-token logits.
 
-def select_valid_function(prompt: str, function:
-                          List[FonctionDefinition],
-                          model: Small_LLM_Model) -> str:
-    function_names: List[str] = [f.name for f in function]
-    token_name: Dict[str, List[int]] = {
-        name: model.encode(name).tolist()[0] for name in function_names}
-
-    system_prompt = (
-        "You are an API dispatcher. "
-        "Select the function that matches the user request.\n"
-        f"Available functions: {', '.join(function_names)}"
+    Returns:
+        The selected function name and the context including its final quote.
+    """
+    if not functions:
+        raise ValueError('Cannot select from an empty function list.')
+    descriptions = [item.model_dump() for item in functions]
+    system = (
+        'You are a function-calling API dispatcher. '
+        'Return a JSON object with name and parameters. '
+        'Copy argument values from the request; do not execute functions. '
+        'For replacements, infer the regex from the request. '
+        'Available functions: ' + json.dumps(descriptions, ensure_ascii=False)
     )
-
-    formatted_context = (
-        f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
-        f"<|im_start|>user\n{prompt}<|im_end|>\n"
-        f'<|im_start|>assistant\n{{"name": "'
+    context = (
+        f'<|im_start|>system\n{system}<|im_end|>\n'
+        f'<|im_start|>user\n{prompt}<|im_end|>\n'
+        '<|im_start|>assistant\n{"name": '
     )
-
-    input_id: List[int] = model.encode(formatted_context).tolist()[0]
-    generated_name_tokens: List[int] = []
-
+    current: list[int] = model.encode(context).tolist()[0]
+    branches: dict[str, list[int]] = {
+        function.name: model.encode(json.dumps(function.name)).tolist()[0]
+        for function in functions
+    }
+    generated: list[int] = []
     while True:
-        nb_token_choice = len(generated_name_tokens)
-        matching_branches = [seq for seq in token_name.values()
-                             if seq[:nb_token_choice] == generated_name_tokens]
-
-        valid_next_token: Set[int] = {
-            seq[nb_token_choice] for seq in matching_branches
-            if len(seq) > nb_token_choice}
-
-        if not valid_next_token:
-            break
-
-        rw_logit = model.get_logits_from_input_ids(input_id)
-        logit = numpy.array(rw_logit, dtype=numpy.float64)
-
-        mask = numpy.full_like(logit, -numpy.inf)
-        mask[list(valid_next_token)] = 0.0
-        masked_logit = logit + mask
-
-        choosen_token = int(numpy.argmax(masked_logit))
-
-        input_id.append(choosen_token)
-        generated_name_tokens.append(choosen_token)
-
-    for name, seq in token_name.items():
-        if seq == generated_name_tokens:
-            return name
-    raise ValueError("Aucune fonction correspondante n'a été identifiée.")
+        active = {name: sequence for name, sequence in branches.items()
+                  if sequence[:len(generated)] == generated}
+        finished = [name for name, sequence in active.items()
+                    if sequence == generated]
+        if finished:
+            return finished[0], current
+        allowed = [sequence[len(generated)] for sequence in active.values()
+                   if len(sequence) > len(generated)]
+        chosen = choose_token(current, allowed, model)
+        current.append(chosen)
+        generated.append(chosen)

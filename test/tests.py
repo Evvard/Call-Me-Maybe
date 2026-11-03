@@ -1,11 +1,12 @@
-from llm_sdk.llm_sdk import Small_LLM_Model
+from llm_sdk import Small_LLM_Model
 import json
 
 
-def speak_with_llm(prompt):
+def speak_with_llm(prompt: str) -> None:
+    """Explore the SDK with one prompt when run explicitly."""
     llm = Small_LLM_Model()
 
-    # 1. Chargement du vocabulaire et extraction des IDs cibles
+    # 1. Load the vocabulary and extract the target IDs
     vocab_path = llm.get_path_to_vocab_file()
     with open(vocab_path) as f:
         vocab = json.load(f)
@@ -15,4 +16,5 @@ def speak_with_llm(prompt):
     print(json_token_ids)
 
 
-speak_with_llm("what is the sum of 2 and 3")
+if __name__ == '__main__':
+    speak_with_llm("what is the sum of 2 and 3")

@@ -1,22 +1,27 @@
-PACKAGE_NAME = call_me_maybe
+.PHONY: install run debug clean lint lint-strict test
 
 install:
-	uv pip install flake8 mypy torch huggingface-hub
-	uv pip install numpy pydantic transformers
+	uv sync
+
 run:
-	python3 
+	uv run python -m src
 
 debug:
-	python3 -m pdb 
+	uv run python -m pdb -m src
 
 clean:
-	find . -type d -name "__pycache__" -exec rm -r {} +
-	find . -type d -name ".mypy_cache" -exec rm -r {} +
+	find . -type d \( -name .venv -o -name venv -o -name .git \) -prune -o \
+		-type d \( -name __pycache__ -o -name .mypy_cache -o -name .pytest_cache \) \
+		-exec rm -rf {} +
+	rm -rf data/output
 
 lint:
-	flake8 .
-	mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
+	uv run flake8 .
+	uv run mypy . --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs
 
 lint-strict:
-	flake8 .
-	mypy . --strict
+	uv run flake8 .
+	uv run mypy . --strict
+
+test:
+	uv run python -m unittest discover -s test -p "test_*.py" -v

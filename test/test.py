@@ -1,9 +1,9 @@
-from llm_sdk.llm_sdk import Small_LLM_Model
-import numpy as np
+from llm_sdk import Small_LLM_Model
 import json
 
 
-def speak_with_llm(prompt):
+def speak_with_llm(prompt: str) -> None:
+    """Explore the SDK with one prompt when run explicitly."""
     llm = Small_LLM_Model()
     input_ids = llm.encode(prompt).tolist()[0]
     print(input_ids)
@@ -36,19 +36,22 @@ def speak_with_llm(prompt):
     logit = llm.get_logits_from_input_ids(inputs_ids)
 
     forbidden_token_id = logit.index(max(logit))
-    print(f"Token banni temporairement: '{llm.decode(forbidden_token_id)}' (ID: {forbidden_token_id})")
+    print(
+        f"Token banni temporairement: '{llm.decode([forbidden_token_id])}' "
+        f"(ID: {forbidden_token_id})"
+    )
 
     logit[forbidden_token_id] = float('-inf')
-    logit["{"] = float('+inf')
+    logit[vocab["{"]] = float('+inf')
 
     next_token_id = logit.index(max(logit))
-    print("Nouveau Pro Token après masquage: ", llm.decode(next_token_id))
+    print("Nouveau Pro Token après masquage: ", llm.decode([next_token_id]))
     print()
 
 
-""" 
+"""
     next_token_id = logit.index(max(logit))
-    print("Pro Token: ", llm.decode(next_token_id))
+    print("Pro Token: ", llm.decode([next_token_id]))
     print()
 
     first = vocab["{"]
@@ -63,9 +66,5 @@ def speak_with_llm(prompt):
 """
 
 
-
-
-
-
-
-speak_with_llm("What the sum of 2 and 3")
+if __name__ == '__main__':
+    speak_with_llm("What the sum of 2 and 3")
