@@ -883,3 +883,30 @@ uv run python -m src
 ```
 
 `make debug` permet ensuite de suivre l’exécution dans `pdb`. Des points d’arrêt dans `select_valid_function()`, `decode_parameter()` et `validate_call()` montrent respectivement la sélection, la génération et le contrôle final.
+
+
+## 15. Correction du 9 novembre : mypy et le SDK installé en mode éditable
+
+Le projet est maintenant dans `Cercle_3/call_me`. Python charge correctement
+`llm_sdk/llm_sdk/__init__.py` après `uv sync`. Cependant, lors de `mypy src`,
+l’analyseur pouvait interpréter le dossier extérieur `llm_sdk` comme un paquet
+namespace, sans y trouver `Small_LLM_Model`. Cela explique pourquoi le programme
+s’exécutait alors que la vérification de types échouait.
+
+La configuration racine indique désormais explicitement le chemin des sources :
+
+```toml
+[tool.mypy]
+mypy_path = "$MYPY_CONFIG_FILE_DIR/llm_sdk"
+```
+
+Le chemin part du dossier de `pyproject.toml`, et non du répertoire personnel ou
+d’un nom de projet fixé en dur. La correction reste donc valable si le dépôt est
+renommé ou déplacé. Elle ne masque aucune erreur de type et ne modifie pas
+l’import utilisé par Python.
+
+La bonne commande Make est `make lint`. `make lintr` demande une cible inexistante.
+Le message `Cannot read ... introuvable.json` est le comportement attendu quand
+on teste volontairement un fichier absent : le programme signale l’erreur et
+termine avec un code non nul, sans traceback non géré. L’avertissement HF_TOKEN
+vu dans la capture n’a pas empêché les deux lots de s’exécuter.
