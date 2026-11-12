@@ -3,7 +3,7 @@
 import json
 import math
 from pathlib import Path
-from typing import Any, Literal, Mapping, Union
+from typing import Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -12,7 +12,7 @@ ParameterType = Literal['number', 'string', 'boolean']
 
 
 class InputDetail(BaseModel):
-    """Describe one required scalar argument and reject unknown fields."""
+    """Describe one required argument and reject unknown fields."""
 
     model_config = ConfigDict(extra='forbid', strict=True)
     type: ParameterType
@@ -103,7 +103,7 @@ def load_prompts(path_json: str | Path) -> list[PrompTest]:
 def validate_call(
     prompt: str,
     definition: FonctionDefinition,
-    parameters: Mapping[str, ParameterValue],
+    parameters: dict[str, ParameterValue],
 ) -> FunctionCallResult:
     """Check exact argument keys, scalar types, and finite numbers.
 

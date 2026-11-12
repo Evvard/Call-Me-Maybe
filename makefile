@@ -1,4 +1,4 @@
-.PHONY: install run debug clean lint lint-strict test
+.PHONY: install run debug clean lint lint-strict
 
 install:
 	uv sync
@@ -22,6 +22,3 @@ lint:
 lint-strict:
 	uv run flake8 .
 	uv run mypy . --strict
-
-test:
-	uv run python -m unittest discover -s test -p "test_*.py" -v
