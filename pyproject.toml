@@ -17,4 +17,8 @@ llm-sdk = { path = "llm_sdk", editable = true }
 
 [tool.mypy]
 mypy_path = "$MYPY_CONFIG_FILE_DIR/llm_sdk"
-exclude = ["^\\.venv/"]
+exclude = ["^\\.venv/", "^llm_sdk/"]
+
+[[tool.mypy.overrides]]
+module = ["llm_sdk", "llm_sdk.*"]
+follow_imports = "skip"

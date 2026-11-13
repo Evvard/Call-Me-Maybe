@@ -36,7 +36,9 @@ make clean
 ```
 
 `make lint` runs `flake8 .` and `mypy .` with all options required by the subject.
-`make lint-strict` also checks `mypy . --strict`. Generated environments, caches
+`make lint-strict` also checks `mypy . --strict`. Both tools exclude the supplied
+`llm_sdk` directory; mypy also skips analysis of that package through imports.
+Generated environments, caches
 and output files are excluded from Git. `make clean` removes project caches and
 `data/output` while preserving the environment and Git metadata.
 
@@ -69,8 +71,8 @@ selection does not use keyword heuristics or hardcoded answers.
   and additional model-selection features are not implemented.
 - The application uses the SDK's public methods. Torch and Transformers remain
   inside the supplied SDK; application code does not access SDK private fields.
-- There is no inference cache or batching. Each logits request processes its
-  complete input context with `use_cache=False`.
+- The SDK matches the copy in `llm_sdk.zip`. The application adds no inference
+  cache or batching and sends the complete context for each logits request.
 - Numbers are checked with Python JSON parsing. An explicit loop checks open
   strings and their escapes. The decoder uses no regular expressions.
 - Token pieces decoded as the Unicode replacement character are excluded. Some
@@ -91,8 +93,10 @@ JSON, and a batch runtime under five minutes on standard hardware. Schema validi
 and semantic accuracy are separate properties: a valid float can still be the
 wrong number for a request.
 
-The November 13 run after removing regular expressions processed the 11 bundled
-prompts in 267.29 seconds with the model already downloaded. All 11 outputs were
+The November 13 run after removing regular expressions, before restoring the
+original SDK, processed the 11 bundled prompts in 267.29 seconds with the model
+already downloaded. Runtime has not been measured again with the restored SDK.
+All 11 outputs were
 schema-compliant and selected the right function; 10 calls had correct arguments
 (90.91%). One vowel replacement used `" *"` instead of `"*"`. This semantic error
 remains unresolved. A separate three-prompt run with different function definitions

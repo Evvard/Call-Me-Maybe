@@ -60,7 +60,7 @@ du texte par le modèle.
 | `pyproject.toml` | Dépendances et configuration mypy de l’application. |
 | `uv.lock` | Versions résolues pour installer l’ensemble du projet. |
 | `makefile` | Installation, lancement, débogage, lint et nettoyage. |
-| `.flake8` | Exclusions des environnements et caches, lignes de 79 caractères. |
+| `.flake8` | Exclusion du SDK fourni, des environnements et caches ; lignes de 79 caractères. |
 | `.gitignore` | Exclusion des environnements, caches et résultats de Git. |
 | `test/test.py`, `test/tests.py`, `test/testz.py` | Expériences manuelles historiques. |
 | `README.md` | Présentation en anglais exigée par le sujet. |
@@ -495,8 +495,8 @@ n’ajoute pas d’option de choix de modèle ni de fonctionnalité multi-modèl
 
 Le SDK sélectionne MPS, sinon CUDA, sinon CPU, place le modèle sur le périphérique
 et le met en mode évaluation. Les gradients des paramètres sont désactivés.
-Les `cast` de typage servent à décrire les méthodes décorées de Transformers à
-mypy ; ils ne convertissent pas les poids.
+Le SDK actuel correspond au fichier du ZIP fourni. Les adaptations de typage
+précédemment ajoutées au SDK ne sont plus présentes ; son code est exclu du lint.
 
 ### `encode(text)`
 
@@ -515,9 +515,9 @@ préparer le dictionnaire des tokens. Aucun `decode` maison n’est implémenté
 Transforme le contexte complet en tenseur, appelle le modèle sans gradients et
 renvoie les scores de la dernière position pour le prochain token.
 
-L’appel utilise `use_cache=False`. Les anciens attributs `_cached_ids` et
-`_past_key_values`, ainsi que la comparaison de préfixes pour réutiliser le
-cache, ont été supprimés. Chaque demande de logits recalcule son contexte.
+L’appel est celui du SDK d’origine : `self._model(input_ids=input_tensor)`.
+L’ajout `use_cache=False` n’est plus présent. L’application ne conserve aucun
+état d’attention entre deux appels et fournit le contexte complet au SDK.
 
 ### `get_path_to_vocab_file()`
 
@@ -562,16 +562,23 @@ uv run python -m src
 le Makefile actuel. Les anciens résultats de 22 tests d’une autre version ne
 sont donc plus présentés comme la vérification de ce code.
 
-Le chemin mypy du SDK reste configuré :
+Le SDK fourni est exclu de Flake8 et de mypy. Sa configuration mypy est :
 
 ```toml
 [tool.mypy]
 mypy_path = "$MYPY_CONFIG_FILE_DIR/llm_sdk"
+exclude = ["^\\.venv/", "^llm_sdk/"]
+
+[[tool.mypy.overrides]]
+module = ["llm_sdk", "llm_sdk.*"]
+follow_imports = "skip"
 ```
 
-Il évite de confondre le dossier extérieur du SDK avec son paquet Python lors
-d’une vérification ciblée de `src`. Les imports restent
-`from llm_sdk import Small_LLM_Model`.
+`mypy_path` permet de localiser le paquet. `exclude` retire le SDK de la recherche
+des fichiers à contrôler ; `follow_imports = "skip"` empêche son analyse lorsqu’il
+est importé depuis l’application. Ces réglages ne changent pas les imports ni
+l’exécution. Les 9 fichiers Python de l’application et des expériences restent
+contrôlés par les commandes `make lint` et `make lint-strict`.
 
 ## 10. Les expériences manuelles conservées
 
@@ -640,12 +647,14 @@ entrées normales ou des cas limites.
 Le sujet exige un JSON valide et conforme au schéma, au moins 90 % de bons appels
 sur les essais, et moins de cinq minutes pour le lot sur du matériel standard.
 
-Vérification du 13 novembre, après suppression des expressions régulières :
+Vérifications du 13 novembre. Les lignes de lint ci-dessous ont été revérifiées
+avec le SDK d’origine exclu. Les mesures de génération proviennent du lancement
+antérieur à la restauration du SDK ; leur durée n’a pas été remesurée depuis.
 
 | Contrôle | Résultat |
 |---|---|
-| `make lint` sur tout le projet | Réussi, code de sortie 0 ; 10 fichiers Python vérifiés par mypy. |
-| `make lint-strict` sur tout le projet | Réussi, code de sortie 0 ; 10 fichiers Python vérifiés par mypy. |
+| `make lint` avec exclusion du SDK fourni | Réussi, code de sortie 0 ; 9 fichiers Python vérifiés par mypy. |
+| `make lint-strict` avec exclusion du SDK fourni | Réussi, code de sortie 0 ; 9 fichiers Python vérifiés par mypy. |
 | `uv run mypy src --strict` | Réussi, 5 fichiers. |
 | `uv sync --locked` | Réussi. |
 | Empreintes des deux fichiers protégés | Identiques à celles du début de la simplification. |
