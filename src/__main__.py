@@ -3,8 +3,6 @@
 import argparse
 import json
 import sys
-import tempfile
-import time
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -45,28 +43,18 @@ def parse_args() -> argparse.Namespace:
 
 
 def write_results(path: str, results: List[Dict[str, Any]]) -> None:
-    """Serialize validated calls atomically, refusing NaN and infinity.
+    """Write validated calls as UTF-8 JSON and reject non-finite numbers.
 
     Args:
-        path: Output destination supplied by the command line.
-        results: Fully validated calls in original prompt order.
+        path: Destination supplied by the command line.
+        results: Validated calls in original prompt order.
     """
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode='w', encoding='utf-8', dir=output.parent,
-            prefix=output.name + '.', suffix='.tmp', delete=False,
-        ) as stream:
-            temporary = Path(stream.name)
-            json.dump(results, stream, indent=2, ensure_ascii=False,
-                      allow_nan=False)
-            stream.write('\n')
-        temporary.replace(output)
-    finally:
-        if temporary is not None and temporary.exists():
-            temporary.unlink()
+    with output.open('w', encoding='utf-8') as stream:
+        json.dump(results, stream, indent=2, ensure_ascii=False,
+                  allow_nan=False)
+        stream.write('\n')
 
 
 def main() -> None:
@@ -78,12 +66,8 @@ def main() -> None:
             Path(args.functions_definition).resolve(),
         }:
             raise ValueError('Output must not overwrite either input file.')
-        started = time.monotonic()
 
         functions = validation_function(args.functions_definition)
-        if not functions:
-            raise ValueError("The functions definition list cannot be empty.")
-
         functions_map = {fn.name: fn for fn in functions}
         prompts = load_prompts(args.input)
 
@@ -96,10 +80,10 @@ def main() -> None:
         with open(vocab_path, "r", encoding="utf-8") as f:
             vocab: Dict[str, int] = json.load(f)
 
-        tokens = build_vocabulary(vocab)
+        tokens = build_vocabulary(vocab, model)
         results: List[Dict[str, Any]] = []
 
-        for index, item in enumerate(prompts, 1):
+        for item in prompts:
             chosen_name, current_ids = select_valid_function(
                 item.prompt, functions, model
             )
@@ -116,9 +100,6 @@ def main() -> None:
                 item.prompt, selected_func_def, extracted_params
             )
             results.append(validated_output.model_dump())
-            elapsed = time.monotonic() - started
-            print(f'Processed {index}/{len(prompts)}: {chosen_name} '
-                  f'({elapsed:.1f}s)', file=sys.stderr)
 
         write_results(args.output, results)
 

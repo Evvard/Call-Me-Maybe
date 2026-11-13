@@ -4,23 +4,22 @@
 
 ## Description
 
-Translate natural-language requests into function calls with typed arguments,
-using Qwen/Qwen3-0.6B through the provided LLM SDK. The program selects a function
-and extracts its inputs; it does not execute that function. Constrained decoding
-restricts the model's token choices to the supplied definitions and JSON grammar.
+Convert natural-language requests into function names and scalar arguments with
+Qwen/Qwen3-0.6B and the provided LLM SDK. The program prepares calls; it does not
+execute functions or return their calculated results. This version targets the
+mandatory assignment and does not add bonus features.
 
 ## Instructions
 
-Use Python 3.10 or newer and install uv. From the repository root:
+Use Python 3.10 or newer and uv. From the project root:
 
 ```sh
 uv sync
 uv run python -m src
 ```
 
-The first run needs access to Hugging Face to download the model. Subsequent runs
-can use the local cache. Model inference is performed locally; hardware and model
-storage requirements are inherited from the supplied SDK.
+The SDK downloads the model on first use if it is not already available locally.
+No manual virtual-environment activation is needed for `uv run`.
 
 ```sh
 uv run python -m src \
@@ -33,101 +32,98 @@ make run
 make debug
 make lint
 make lint-strict
-make test
 make clean
 ```
 
-`make lint` runs `flake8 .` and the subject's required mypy options. Strict lint
-runs `flake8 .` and `mypy . --strict`. Neither command suppresses SDK diagnostics.
-Generated files, environments and caches are excluded from version control.
+`make lint` runs `flake8 .` and `mypy .` with all options required by the subject.
+`make lint-strict` also checks `mypy . --strict`. Generated environments, caches
+and output files are excluded from Git. `make clean` removes project caches and
+`data/output` while preserving the environment and Git metadata.
 
 ## Algorithm explanation
 
-1. Pydantic validates both input arrays, the supported scalar types, unique function
-   names and the absence of unknown schema fields.
-2. The model receives the user request and available function definitions. A prefix
-   tree of tokenized, JSON-quoted names restricts selection to existing functions.
-   Including the closing quotation mark lets a short name finish even when another
-   name starts with the same text.
-3. The program injects structural punctuation and argument names from the schema.
-   The LLM chooses argument values, with each candidate token checked against the
-   relevant JSON prefix grammar before selection.
-4. Numbers follow a finite-state grammar: optional minus, integer, optional decimal
-   fraction and optional exponent. Boolean values are restricted to `true` and
-   `false`. Strings track quotation marks, escapes, Unicode escapes and UTF-8 bytes.
-5. Function-specific validation checks exact argument keys, scalar types and finite
-   numeric values. `json.dump(..., allow_nan=False)` serializes the validated calls
-   to a temporary sibling file, then atomically replaces the requested output.
+1. Pydantic validates the function definitions and prompts. Definitions must have
+   unique nonempty names and supported scalar argument types.
+2. The LLM chooses among tokenized, JSON-quoted function names. At each step,
+   incompatible name continuations are excluded from token selection.
+3. The application reads the public vocabulary file and uses the SDK's `decode`
+   method to obtain token text. It does not reimplement a tokenizer.
+4. Required JSON keys and punctuation are injected from the schema. The model
+   chooses argument values from tokens allowed by JSON prefix rules: numbers,
+   escaped strings, and the boolean literals `true` and `false`.
+5. JSON whitespace around numbers and booleans is allowed. String opening quotes
+   are encoded together with their schema keys rather than as separate fragments.
+   Tokens spanning a string's closing quote and following punctuation are accepted
+   only when the remaining structure matches the expected next key.
+6. The final call is checked against the selected function's exact argument keys
+   and types, then serialized with `json.dump(..., allow_nan=False)`.
 
-The highest finite score among valid token IDs is equivalent to greedy selection
-with all forbidden logits set to negative infinity. Function choice is always
-based on LLM logits; there is no keyword dispatch or hardcoded answer table.
+When only one token is allowed, the grammar imposes it without an LLM decision.
+Otherwise the highest finite LLM score among allowed tokens is selected. This is
+equivalent to masking all forbidden tokens with negative infinity. Function
+selection does not use keyword heuristics or hardcoded answers.
 
 ## Design decisions
 
-- The application uses standard Python, NumPy, Pydantic and the SDK's public API.
-  Torch and Transformers belong inside the supplied SDK, not the application.
-- The vocabulary decoder targets Qwen's ByteLevel vocabulary. Extra model support
-  would require checking its tokenizer representation first.
-- Mandatory scalar arguments support `number`, `string` and `boolean`. Unsupported
-  types are rejected explicitly; nested schemas are outside this implementation.
-- Numbers are represented as finite Python floats. This entails ordinary float
-  precision limits. Invalid numbers are never replaced with an invented zero.
-- Every required argument is generated in declaration order. Strings preserve
-  leading/trailing whitespace and escaped quotation marks.
-- A 256-token bound per scalar reports an error instead of returning truncated data.
-- Invalid input is reported before loading model weights. Empty prompt arrays produce
-  `[]` without initializing the model. An output path cannot overwrite an input.
-- The SDK's imports and annotations were adjusted for its installed package layout
-  and current type stubs. Incremental inference now reuses its key/value cache
-  for extended contexts; a new prompt resets the cache automatically. The public
-  methods remain available and the application never accesses private SDK fields.
+- Scalar arguments support `number`, `string` and `boolean`. Nested arguments
+  and additional model-selection features are not implemented.
+- The application uses the SDK's public methods. Torch and Transformers remain
+  inside the supplied SDK; application code does not access SDK private fields.
+- There is no inference cache or batching. Each logits request processes its
+  complete input context with `use_cache=False`.
+- Numbers are checked with Python JSON parsing. An explicit loop checks open
+  strings and their escapes. The decoder uses no regular expressions.
+- Token pieces decoded as the Unicode replacement character are excluded. Some
+  rare Unicode text split across individual tokens may therefore be harder to
+  generate; JSON Unicode escapes remain supported.
+- Numbers are finite Python floats, with the usual precision limits. Invalid
+  values are reported rather than replaced with invented zeroes.
+- A 256-token argument limit reports unfinished values instead of silently
+  truncating them. Strings retain their leading/trailing whitespace.
+- Output is written directly with a context manager. There is no temporary-file
+  recovery mechanism. An output path cannot overwrite either input file.
+- Empty prompt arrays produce `[]` without loading model weights.
 
 ## Performance analysis
 
-Syntax and schema validity are enforced independently of the model's semantic
-accuracy. A well-typed argument can still be the wrong argument for a request.
-The subject's targets are at least 90% correct complete calls and a batch runtime
-below five minutes on standard hardware. Measured results are recorded in the
-French `doc.md`; these targets must be evaluated rather than inferred from lint.
+The mandatory targets are at least 90% correct calls, 100% valid schema-compliant
+JSON, and a batch runtime under five minutes on standard hardware. Schema validity
+and semantic accuracy are separate properties: a valid float can still be the
+wrong number for a request.
 
-On the bundled 11 prompts, the measured pipeline time was 57.9 seconds with model
-weights already cached locally (dependency import time is outside this timer).
-All 11 outputs were valid and schema-compliant, all 11 functions were selected
-correctly, and 10 complete calls were correct (90.91%). Regex spellings were
-checked by their behavior on the supplied strings. One call generated `**`
-instead of `*` as its replacement, so semantic accuracy was not 100%. This is a
-measurement on the bundled examples, not a guarantee for unseen evaluation data.
+The November 13 run after removing regular expressions processed the 11 bundled
+prompts in 267.29 seconds with the model already downloaded. All 11 outputs were
+schema-compliant and selected the right function; 10 calls had correct arguments
+(90.91%). One vowel replacement used `" *"` instead of `"*"`. This semantic error
+remains unresolved. A separate three-prompt run with different function definitions
+was schema-compliant in all cases but correct in only two: an explicitly empty
+string became a single space. Across both runs, 12 of 14 calls were correct
+(85.71%), below the 90% target. Full assignment compliance is therefore not
+established. Detailed checks and limitations are recorded in the French `doc.md`.
+Results do not guarantee equal accuracy on unseen prompts or the same runtime on
+different hardware.
 
 ## Challenges faced
 
-The original number whitelist accepted malformed values such as `--2` and `1.2.3`.
-A grammar now rejects these continuations before selection. The original string
-stop condition discarded a whole token if it contained a quotation mark, losing
-text before that mark. Byte-level prefix validation preserves such text and
-supports escaped characters. Input schema typos, duplicate function names and
-mismatched output types now produce explicit errors.
+A numeric character whitelist can accept `--2` or `1.2.3`; prefix grammar rules
+reject those continuations. String tokens can contain both content and closing
+punctuation, so discarding an entire token at the first quote loses data. The
+standard JSON decoder identifies the literal boundary and the expected schema
+suffix controls any trailing syntax. Exact final key/type validation prevents
+extra or missing arguments from reaching successful output.
 
 ## Testing strategy
 
-`make test` runs deterministic tests without model downloads or neural inference.
-The suite covers schema rejection, bundled definitions, exact output keys, strict
-scalar types, invalid numeric syntax, non-finite values, escaped strings, boolean
-selection, shared function-name prefixes and generation limits.
-
-The original manual SDK experiments are retained under `test/`; they execute only
-when invoked directly. Model-based accuracy checks complement the deterministic
-suite. Valid output files must contain exactly `prompt`, `name` and `parameters`.
+Verification uses the assignment's normal CLI, complete lint targets, and temporary
+checks of malformed input, scalar grammar rules, string escapes and output types.
+These checks are kept outside the submitted repository; no comprehensive bonus
+test suite is added. The `test/` directory retains the original manual SDK
+experiments, which run only when explicitly invoked. There is no `make test`
+target in the current Makefile.
 
 ## Example usage
 
-Input prompt:
-
-```json
-{"prompt": "What is the sum of 2 and 3?"}
-```
-
-Expected call within the output array:
+For `What is the sum of 2 and 3?`, the expected object in the output array is:
 
 ```json
 {
@@ -139,7 +135,7 @@ Expected call within the output array:
 
 ## Resources
 
-- The local assignment, `en.subject.pdf`, version 1.7, defines the requirements.
+- The provided `en.subject.pdf`, version 1.7, defines the requirements.
 - [JSON specification, RFC 8259](https://www.rfc-editor.org/rfc/rfc8259)
 - [Python JSON module](https://docs.python.org/3/library/json.html)
 - [Pydantic documentation](https://docs.pydantic.dev/)
@@ -147,8 +143,9 @@ Expected call within the output array:
 - [Flake8 documentation](https://flake8.pycqa.org/)
 - [Qwen3-0.6B model](https://huggingface.co/Qwen/Qwen3-0.6B)
 
-AI assistance was used to translate French code comments to English, compare the
-implementation with the assignment, correct validation and constrained decoding,
-repair dependency and lint configuration, write regression tests, run checks and
-prepare the README and detailed French learning document. The author must review
-and understand these changes and be able to explain them during evaluation.
+AI assistance was used for comment translation, assignment review, validation and
+constrained-decoding corrections, dependency/lint setup, temporary verification
+and documentation. It was also used to simplify the decoder and remove the added
+inference cache, custom byte conversion and temporary-file output logic.
+`parser.py` and `function_select.py` were left unchanged during this simplification.
+The author must understand and be able to explain the submitted implementation.

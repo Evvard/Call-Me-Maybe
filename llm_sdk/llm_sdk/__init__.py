@@ -2,7 +2,7 @@
 # ABOUTME: Loads and runs causal language models via Small_LLM_Model.
 
 import logging
-from typing import Any, Callable, cast
+from typing import Callable, cast
 
 import torch
 from transformers import (
@@ -38,8 +38,6 @@ class Small_LLM_Model:
         trust_remote_code: bool = True,
     ) -> None:
         self._model_name = model_name
-        self._cached_ids: list[int] = []
-        self._past_key_values: Any = None
 
         # Auto-select device with priority: mps > cuda > cpu
         if device is None:
@@ -97,21 +95,11 @@ class Small_LLM_Model:
         """
         Return raw next-token logits for the given token IDs.
         """
-        reuse = (
-            self._past_key_values is not None
-            and len(input_ids) > len(self._cached_ids)
-            and input_ids[:len(self._cached_ids)] == self._cached_ids
-        )
-        pending = input_ids[len(self._cached_ids):] if reuse else input_ids
-        past = self._past_key_values if reuse else None
         input_tensor = torch.tensor(
-            [pending], device=self._device, dtype=torch.long
+            [input_ids], device=self._device, dtype=torch.long
         )
         with torch.no_grad():
-            out = self._model(input_ids=input_tensor, past_key_values=past,
-                              use_cache=True)
-        self._cached_ids = input_ids.copy()
-        self._past_key_values = out.past_key_values
+            out = self._model(input_ids=input_tensor, use_cache=False)
         # Read the last position in the single-sequence batch.
         logits = out.logits[0, -1].tolist()
         return [float(x) for x in logits]

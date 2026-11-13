@@ -1,18 +1,26 @@
-# Call Me Maybe — comprendre le projet et ses corrections
+# Call Me Maybe — version obligatoire simplifiée
 
-Bilan des vérifications : **22 tests réussis**, `make lint` et `make lint-strict` réussis sur les 13 fichiers Python. Avec Qwen, les 11 questions fournies ont été traitées en 57,9 secondes de pipeline : 11 sorties conformes au schéma et 10 appels entièrement corrects, soit 90,91 %. Le cas restant et la méthode de mesure sont détaillés en section 13.
+Guide en français pour **eolivier**, mis à jour le **13 novembre 2026**.
 
-Document en français pour **eolivier**. Les commentaires et docstrings du code restent en anglais, comme demandé. Ce guide accompagne le sujet version 1.7 fourni dans le dépôt.
+Cette version vise la partie obligatoire du sujet 1.7. Les fichiers
+`src/parser.py` et `src/function_select.py` ont été conservés exactement tels
+qu’ils étaient au début de la simplification : leur contenu est vérifié par
+empreinte SHA-256. Les commentaires et docstrings restent en anglais.
 
-## 1. Ce que le programme doit faire
+Le cache d’inférence ajouté précédemment a été supprimé. Il n’y a pas de
+batching, de tokenizer réécrit, de génération graphique, d’arguments imbriqués,
+de mécanisme de récupération avancée ni de suite de tests complète ajoutée au
+rendu. Les contrôles nécessaires à la partie obligatoire sont conservés.
 
-Pour la question :
+## 1. Le travail demandé
+
+À partir de :
 
 ```text
 What is the sum of 2 and 3?
 ```
 
-le programme doit construire :
+le programme doit produire un appel :
 
 ```json
 {
@@ -22,61 +30,62 @@ le programme doit construire :
 }
 ```
 
-Il ne doit pas calculer `5`. Son travail consiste à sélectionner un outil et à préparer ses arguments. L’exécution réelle de l’outil ne fait pas partie de ce projet.
+Il ne calcule pas la somme et n’exécute pas la fonction. Le LLM sélectionne
+l’outil et extrait les arguments ; le programme impose la structure attendue.
 
-Trois propriétés différentes doivent être distinguées :
+Il faut distinguer trois contrôles :
 
-1. **Syntaxe** : peut-on relire le fichier avec un parseur JSON ?
-2. **Schéma** : retrouve-t-on exactement les bons champs et les bons types ?
-3. **Sens** : a-t-on choisi la bonne fonction et extrait les bonnes valeurs ?
+- **Syntaxe** : le fichier est-il un JSON lisible ?
+- **Schéma** : possède-t-il exactement les bonnes clés et les bons types ?
+- **Sens** : le nom de fonction et les valeurs répondent-ils à la demande ?
 
-Exemple : `{"a": 7.0, "b": 9.0}` possède les bons types pour une addition, mais ce sont de mauvais arguments pour la question « 2 et 3 ». Le décodage contraint sécurise la structure ; il ne rend pas le modèle infaillible sur le sens.
+Un appel contenant `a=7.0` et `b=9.0` reste bien typé, mais serait incorrect
+pour une question portant sur 2 et 3. Pydantic ne vérifie pas la compréhension
+du texte par le modèle.
 
-## 2. Vue d’ensemble des fichiers
+## 2. Les fichiers
 
-| Fichier ou dossier | Rôle |
+| Fichier | Rôle |
 |---|---|
-| `src/__init__.py` | Déclare le paquet de l’application. |
-| `src/__main__.py` | Lance le programme, gère les chemins et assemble le pipeline. |
-| `src/parser.py` | Valide les entrées et les appels produits avec Pydantic. |
-| `src/function_select.py` | Fait choisir une fonction au LLM parmi les noms autorisés. |
-| `src/fn_add_nb.py` | Génère les arguments selon leur grammaire JSON ; son ancien nom a été conservé. |
-| `data/input/functions_definition.json` | Décrit les fonctions disponibles et leurs arguments. |
-| `data/input/function_calling_tests.json` | Contient les demandes à traiter, dans leur ordre. |
-| `data/output/function_calls.json` | Résultat généré par défaut ; ne doit pas être versionné. |
-| `llm_sdk/llm_sdk/__init__.py` | Charge le modèle et expose ses méthodes publiques. |
-| `llm_sdk/pyproject.toml` | Dépendances du SDK fourni. |
-| `llm_sdk/uv.lock` | Ancien verrou propre au sous-projet SDK ; le lancement du projet utilise le verrou racine. |
-| `pyproject.toml` | Dépendances de l’application et lien vers le SDK local. |
-| `uv.lock` | Versions et distributions résolues pour installer le projet. |
-| `makefile` | Commandes de lancement, contrôle, tests et nettoyage. |
-| `.flake8` | Exclut les environnements et caches de l’analyse Flake8. |
-| `.gitignore` | Empêche Git d’ajouter les caches, environnements et résultats générés. |
-| `test/test_validation.py` | Tests des schémas d’entrée et des appels de sortie. |
-| `test/test_decoding.py` | Tests des grammaires et de la sélection contrainte. |
-| `test/test_cli.py` | Tests des fichiers, des erreurs et du programme en ligne de commande. |
-| `test/test.py`, `test/tests.py`, `test/testz.py` | Expériences manuelles historiques sur le SDK. |
-| `README.md` | Présentation en anglais exigée par le sujet, au nom de `eolivier`. |
-| `doc.md` | Le présent guide en français. |
-| `en.subject.pdf` | Sujet de référence. |
+| `src/__init__.py` | Marque le paquet de l’application ; il peut rester vide. |
+| `src/__main__.py` | Arguments de commande, orchestration et écriture du résultat. |
+| `src/parser.py` | Validation Pydantic des entrées et des appels ; non modifié. |
+| `src/function_select.py` | Choix d’une fonction par les logits ; non modifié. |
+| `src/fn_add_nb.py` | Génération contrainte des arguments scalaires. |
+| `data/input/functions_definition.json` | Fonctions proposées, paramètres et types. |
+| `data/input/function_calling_tests.json` | Questions à traiter, dans leur ordre. |
+| `llm_sdk/llm_sdk/__init__.py` | SDK fourni : chargement de Qwen, encodage, décodage et logits. |
+| `llm_sdk/pyproject.toml` | Dépendances du SDK local. |
+| `llm_sdk/uv.lock` | Verrou du sous-projet SDK ; le projet utilise le verrou racine. |
+| `pyproject.toml` | Dépendances et configuration mypy de l’application. |
+| `uv.lock` | Versions résolues pour installer l’ensemble du projet. |
+| `makefile` | Installation, lancement, débogage, lint et nettoyage. |
+| `.flake8` | Exclusions des environnements et caches, lignes de 79 caractères. |
+| `.gitignore` | Exclusion des environnements, caches et résultats de Git. |
+| `test/test.py`, `test/tests.py`, `test/testz.py` | Expériences manuelles historiques. |
+| `README.md` | Présentation en anglais exigée par le sujet. |
+| `doc.md` | Explication française du code actuel. |
+| `en.subject.pdf` | Sujet local de référence, version 1.7. |
 
-Les dossiers `.git`, `.venv`, `__pycache__` et `.mypy_cache` servent aux outils et à l’environnement. Ils ne constituent pas le fonctionnement métier du projet.
+Le résultat par défaut est `data/output/function_calls.json`. C’est un fichier
+généré, exclu de Git. `.venv`, `.mypy_cache` et `__pycache__` ne sont pas des
+sources à remettre.
 
-## 3. Le trajet complet d’une question
+## 3. Le chemin d’une demande
 
-```mermaid
-flowchart TD
-    A[Arguments de la commande] --> B[Validation des définitions et demandes]
-    B --> C[Chargement de Qwen par le SDK]
-    C --> D[Préparation du vocabulaire]
-    D --> E[Choix contraint du nom de fonction]
-    E --> F[Injection des clés des arguments]
-    F --> G[Choix contraint des valeurs]
-    G --> H[Validation des clés et des types]
-    H --> I[Écriture du tableau JSON]
+```text
+Fichiers JSON
+    → validation Pydantic
+    → chargement de Qwen
+    → lecture du vocabulaire et décodage par le SDK
+    → sélection contrainte du nom
+    → génération contrainte des arguments
+    → vérification des clés et des types
+    → écriture du tableau JSON
 ```
 
-Pour une série de demandes, le modèle et le vocabulaire sont chargés une seule fois. La sélection et l’extraction sont ensuite répétées pour chaque demande. L’ordre des résultats correspond à l’ordre des questions d’entrée.
+Le modèle est chargé une seule fois pour le lot. Les demandes sont traitées
+l’une après l’autre ; il n’y a pas de traitement par lots dans le modèle.
 
 ## 4. `src/parser.py` — modèles et validation
 
@@ -203,7 +212,7 @@ Exemples :
 
 Pourquoi exclure explicitement les booléens ? En Python, `bool` hérite de `int`. Un simple `isinstance(True, int)` vaut donc `True`, alors que le schéma JSON distingue les deux types.
 
-Le paramètre utilise `Mapping` : la fonction a besoin de lire les valeurs, pas de modifier le dictionnaire transmis. Une copie `dict(parameters)` est créée pour le modèle final.
+Le paramètre est annoté `dict[str, ParameterValue]` dans la version actuelle de `parser.py`. Le dictionnaire reçu est lu pour vérifier les clés et les valeurs ; `dict(parameters)` crée ensuite une copie pour le modèle final.
 
 ## 5. `src/function_select.py` — choisir la fonction
 
@@ -253,660 +262,447 @@ Le nombre réel de tokens n’est pas le nombre de caractères. Le tokenizer peu
 
 Le contexte retourné inclut le guillemet final du nom. Le programme principal ajoute donc `, "parameters": {` sans rajouter un deuxième guillemet.
 
-## 6. `src/fn_add_nb.py` — grammaires et arguments
+## 6. `src/fn_add_nb.py` — génération des arguments
 
-Ce fichier ne sert plus uniquement à l’addition. Il gère tous les arguments scalaires. Son nom historique a été conservé ; il ne contient pas une solution codée en dur pour `fn_add_numbers`.
+Le nom du fichier est historique : il traite tous les arguments scalaires.
+Il n’y a plus d’import `re`, ni de règle écrite en expression régulière dans
+ce fichier. Les nombres sont lus avec `json.loads()` ; les chaînes incomplètes
+sont parcourues avec une boucle. Les docstrings du code sont courtes ; les
+explications détaillées sont ici.
 
-### 6.1 Classe `TokenVocabulary`
+### 6.1 `build_vocabulary(vocab, model)`
 
-C’est un cache validé par Pydantic, contenant :
+**Entrées :** le vocabulaire `texte → identifiant` et le SDK.
+**Sortie :** un dictionnaire `identifiant → texte décodé`.
 
-- `pieces` : pour chaque identifiant de token, les octets qu’il représente ;
-- `ordinary` : tokens formant du texte UTF-8 simple, sans guillemet, antislash ou contrôle brut ;
-- `special` : tokens demandant une vérification plus précise pour les chaînes ;
-- `numeric` : tokens dont les caractères pourraient appartenir à un nombre.
+La boucle appelle `model.decode([token_id])` pour chaque token ordinaire.
+Le SDK effectue donc le décodage. Les marqueurs spéciaux, textes vides et textes
+contenant le caractère de remplacement `�` sont écartés.
 
-Le mot `special` désigne ici des candidats à contrôler attentivement. Les marqueurs de conversation comme `<|im_end|>` sont exclus de la génération des valeurs.
+Un token représente parfois seulement une partie d’un caractère Unicode. Il
+peut alors être exclu par cette méthode simple. Les échappements JSON comme
+`\u00e9` restent possibles. Ce dictionnaire ne conserve aucun résultat du LLM
+et aucun état d’attention : ce n’est pas un cache d’inférence.
 
-### 6.2 Fonction `build_vocabulary(vocab)`
+### 6.2 `complete_number(text)`
 
-**Entrée :** dictionnaire public chargé depuis le fichier de vocabulaire du SDK.
+**Entrée :** un texte. **Sortie :** `True` si c’est un nombre JSON fini.
 
-**Sortie :** un `TokenVocabulary` réutilisable pour toutes les questions.
+La fonction essaie de lire le texte avec `json.loads()`. Elle vérifie ensuite
+que le résultat est exactement un `int` ou un `float`, puis que
+`math.isfinite()` accepte sa valeur. Un JSON invalide ou un nombre trop grand
+renvoie `False`.
 
-Qwen utilise une représentation de vocabulaire dite ByteLevel : certains caractères visibles représentent des octets qui ne sont pas affichés tels quels. Par exemple, `Ġ` représente habituellement un espace. Retirer simplement ce symbole ferait perdre des espaces significatifs.
+Exemples : `-12.5` est accepté ; `1.` est incomplet ; `01` et `--2` sont
+invalides. `true` est un booléen, donc pas un nombre. `NaN` et `1e309` sont
+refusés, car le résultat ne serait pas fini.
 
-La fonction reconstruit la correspondance entre les 256 octets possibles et les symboles du vocabulaire. Elle transforme ensuite chaque token en octets et le classe dans les groupes utiles.
+### 6.3 `string_prefix(text)`
 
-La séparation en groupes évite de refaire la même analyse pour tous les tokens, à chaque valeur. Le fichier fourni par le SDK est utilisé ; aucun attribut privé du SDK n’est consulté.
+**Entrée :** le texte d’une chaîne en cours de génération, avec son guillemet
+initial. **Sortie :** `True` si elle peut encore être complétée.
 
-**Limite assumée :** cette conversion vise le tokenizer ByteLevel de Qwen. Un modèle utilisant une autre représentation doit être adapté explicitement.
+La boucle parcourt les caractères avec deux variables :
 
-### 6.3 Fonction `number_state(data)`
+- `escaped` : le caractère précédent était un antislash ;
+- `missing_digits` : nombre de chiffres hexadécimaux encore attendus après `\u`.
 
-**Entrée :** octets d’un nombre en cours de construction.
+Dans un échappement Unicode, seuls `0` à `9`, `a` à `f` et `A` à `F` sont
+acceptés. Après un antislash, seuls les échappements JSON sont acceptés :
+`\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`, `\t` et `\uXXXX`.
+Dans le texte normal, un contrôle brut ou un guillemet non échappé termine
+ce préfixe ouvert et renvoie `False`.
 
-**Sortie :** deux booléens `(préfixe_valide, nombre_complet)`.
+Un antislash final ou un `\u12` incomplet reste autorisé : les tokens suivants
+peuvent le compléter. La fermeture de la chaîne est reconnue séparément par
+`string_completion()`. Par exemple, `"bonjour` est un préfixe ouvert ;
+`"bonjour"` est une chaîne complète.
 
-La fonction parcourt le texte en gardant un état. Chaque caractère doit permettre une transition légale :
+### 6.4 `valid_prefix(text, kind)`
 
-| État | Ce qui peut venir ensuite |
-|---|---|
-| Début | `-` ou un chiffre. |
-| Signe | Un chiffre. |
-| Zéro initial | Un point ou un exposant ; pas un deuxième chiffre entier. |
-| Partie entière | Des chiffres, un point ou un exposant. |
-| Point | Au moins un chiffre. |
-| Fraction | Des chiffres ou un exposant. |
-| Marqueur d’exposant | Un signe facultatif ou un chiffre. |
-| Signe d’exposant | Un chiffre. |
-| Chiffres d’exposant | D’autres chiffres ou la fin du nombre. |
+**Entrées :** texte candidat et type attendu. **Sortie :** peut-on continuer ?
 
-Un préfixe valide n’est pas toujours un nombre complet :
+Pour une chaîne, elle appelle `string_prefix()`. Pour un booléen, elle vérifie
+que `true` ou `false` commence par le texte : `tru` passe, `trux` échoue.
+Les espaces JSON autour d’un booléen sont acceptés.
 
-| Texte | Préfixe valide ? | Complet ? |
+Pour un nombre, elle écarte d’abord les caractères étrangers à un nombre JSON.
+Cette vérification seule serait insuffisante : `1.2.3` contient uniquement des
+caractères numériques, mais reste invalide. Elle demande donc aussi :
+
+```python
+complete_number(text) or complete_number(text + '0')
+```
+
+Pourquoi ajouter `0` ? Un nombre inachevé courant peut être complété par un
+chiffre. Cette vérification permet de conserver les tokens de début :
+
+| Texte | Texte suivi de `0` | Résultat |
 |---|---|---|
-| `-` | Oui | Non |
-| `1.` | Oui | Non |
-| `1e-` | Oui | Non |
-| `-2.5e3` | Oui | Oui |
-| `01` | Non | Non |
-| `--2` | Non | Non |
-| `1.2.3` | Non | Non |
+| `-` | `-0` | Préfixe accepté. |
+| `1.` | `1.0` | Préfixe accepté. |
+| `1e-` | `1e-0` | Préfixe accepté. |
+| `01` | `010` | Toujours invalide, rejeté. |
+| `1.2.3` | `1.2.30` | Toujours invalide, rejeté. |
 
-La virgule ou l’accolade de fin ne devient autorisée que lorsque le nombre est complet. Cela évite qu’un argument numérique se termine après un simple `-`.
+Le zéro sert uniquement au contrôle. Il n’est ajouté ni au contexte du modèle,
+ni à la valeur retournée. `json.loads()` accepte les espaces autour d’un nombre,
+mais rejette un espace au milieu, comme dans `1 2`.
 
-Cette grammaire remplace l’ancienne liste de caractères autorisés, qui ne vérifiait pas leur ordre.
+### 6.5 `choose_token(current_ids, allowed, model)`
 
-### 6.4 Fonction `string_state(data)`
+**Entrées :** contexte, identifiants autorisés et SDK. **Sortie :** identifiant
+ayant le meilleur score parmi les choix autorisés.
 
-**Entrée :** octets d’une chaîne JSON, avec son guillemet initial.
+S’il n’existe qu’un choix, la structure impose ce token. Sinon, la fonction
+demande les logits au SDK, garde les scores des identifiants autorisés et
+choisit leur maximum avec NumPy. Les scores non finis sont exclus. Aucun choix
+possible provoque une erreur explicite.
 
-**Sortie :** `(préfixe_valide, chaîne_complète)`.
+`function_select.py` importe cette fonction : sa signature est conservée.
+Le nom et les arguments sont toujours sélectionnés à partir des scores du
+modèle quand il existe plusieurs possibilités.
 
-Elle suit deux informations essentielles :
+### 6.6 `string_completion(text, suffix)`
 
-- un antislash a-t-il ouvert une séquence d’échappement ?
-- combien de chiffres hexadécimaux restent-ils à lire après `\u` ?
+**Entrées :** texte candidat et structure attendue après la valeur.
+**Sortie :** littéral JSON complet et suffixe restant, ou `None`.
 
-Un guillemet termine la chaîne seulement s’il n’est pas échappé. Un retour à la ligne brut est interdit à l’intérieur d’une chaîne JSON ; la séquence de caractères `\n` est permise.
+Un seul token peut contenir `hello",`. Il faut conserver `hello` et reconnaître
+la virgule déjà présente. `json.JSONDecoder().raw_decode(text)` donne la valeur
+et l’emplacement de sa fin. La fonction exige une chaîne encodable en UTF-8,
+puis vérifie que les caractères suivants correspondent au suffixe prévu.
 
-```text
-"Bonjour \"ami\""   → contient des guillemets dans la valeur
-"ligne\nsuivante"   → contient un retour à la ligne après décodage JSON
-"\u0041"           → devient A
-```
+Exemple : pour le candidat `"hello", "b` et le suffixe `, "b":`, la valeur
+est `hello` et il reste à ajouter `":`. Le séparateur n’est pas dupliqué, et
+le modèle ne peut pas inventer une autre clé. L’espace après la virgule est
+facultatif.
 
-Une séquence UTF-8 peut être répartie sur plusieurs tokens. Le contrôle du préfixe accepte donc une séquence incomplète si les octets suivants peuvent encore la compléter. À la fermeture, `json.loads()` vérifie la chaîne complète et son encodage.
+### 6.7 `parse_scalar(text, kind)`
 
-Aucun `.strip()` n’est appliqué. Les espaces avant et après le texte appartiennent à la valeur et doivent être conservés.
+**Entrées :** littéral complet et type attendu. **Sortie :** valeur Python.
 
-### 6.5 Fonction `primitive_state(data, kind)`
+`json.loads()` interprète le texte, puis le nombre est converti en `float`
+fini. Une chaîne reste un `str` et un booléen reste un `bool`. Une incohérence
+provoque une erreur. Les espaces dans les chaînes sont conservés ; `\u00e9`
+devient `é` et `\n` devient un retour à la ligne.
 
-Elle choisit la grammaire selon `kind` :
+Les flottants gardent leurs limites de précision. Le programme ne remplace
+jamais une valeur invalide par un zéro inventé.
 
-- `number` : `number_state()`, puis contrôle de finitude si le nombre est complet ;
-- `string` : `string_state()` ;
-- `boolean` : le préfixe doit appartenir à `true` ou `false`.
+### 6.8 `decode_parameter(...)`
 
-Les booléens JSON s’écrivent en minuscules. `True` est une écriture Python, pas un littéral JSON valide.
+**Entrées :** contexte, type, textes des tokens, SDK, suffixe attendu et limite
+de génération. **Sortie :** un argument Python validé.
 
-Un nombre comme `1e309` possède une syntaxe numérique, mais dépasse la représentation flottante finie utilisée ici : il est refusé comme candidat complet.
+La fonction répète cinq opérations :
 
-### 6.6 Fonction `choose_token(current_ids, allowed, model)`
+1. essayer chaque token à la suite du texte actuel ;
+2. garder les préfixes autorisés ;
+3. reconnaître aussi la fermeture d’une chaîne avec son suffixe éventuel ;
+4. choisir le prochain token avec `choose_token()` ;
+5. l’ajouter au contexte et poursuivre ou terminer.
 
-**Entrées :** contexte complet, identifiants autorisés et modèle.
+Pour une chaîne, le guillemet initial est déjà dans le contexte : il ne faut
+pas l’ajouter une seconde fois. Pour un nombre, le séparateur de fin devient
+un choix possible seulement si `complete_number(text)` est vrai. Un booléen
+se termine quand `true` ou `false` est complet.
 
-**Sortie :** identifiant du meilleur token compatible avec la grammaire.
+La valeur passe ensuite par `parse_scalar()`. Seule la partie manquante du
+suffixe est ajoutée. Au-delà de 256 tokens, une erreur signale une génération
+inachevée ; la fonction ne renvoie pas un argument tronqué.
 
-Le SDK renvoie un logit par token du vocabulaire. Un logit est un score, pas nécessairement une probabilité entre 0 et 1.
+### 6.9 `extract_all_parameters(...)`
 
-La fonction :
+**Entrées :** définition sélectionnée, contexte, tokens et SDK.
+**Sortie :** dictionnaire des arguments générés.
 
-1. récupère les scores du modèle ;
-2. déduplique et trie les identifiants autorisés ;
-3. vérifie qu’ils correspondent bien à des positions du tableau de scores ;
-4. transforme les scores non finis en `-inf` ;
-5. choisit l’argument du maximum parmi les candidats valides.
+La fonction parcourt les arguments dans leur ordre de définition. Elle impose
+les clés et la ponctuation avec `json.dumps()`, puis demande chaque valeur à
+`decode_parameter()`. Une fonction sans argument renvoie `{}`.
 
-Exemple :
+La clé et le guillemet d’ouverture d’une chaîne sont encodés ensemble. Cela
+évite de découper artificiellement cette structure en tokens peu naturels.
+Le suffixe prépare la clé suivante ou ferme l’objet avec `}`.
 
-| Token | Score | Autorisé ? |
-|---|---:|---|
-| Lettre `a` | 12 | Non |
-| Chiffre `2` | 8 | Oui |
-| Chiffre `3` | 6 | Oui |
+## 7. `src/__main__.py` — le programme principal
 
-Le résultat est `2`. Le modèle préférerait globalement `a`, mais la grammaire l’interdit.
+### 7.1 `parse_args()`
 
-Choisir uniquement parmi les indices autorisés est équivalent, pour cette sélection gloutonne, à remplacer tous les autres scores par `-inf` dans un masque de taille vocabulaire.
+Lit les options avec `argparse` :
 
-Si aucun candidat valide ne possède de score fini, la fonction lève une erreur claire au lieu de sélectionner arbitrairement le token zéro.
-
-### 6.7 Fonction `string_completion(data, suffix)`
-
-Cette fonction corrige une frontière importante entre les tokens et les champs JSON.
-
-Un token n’est pas forcément un morceau de texte situé entièrement à l’intérieur d’une valeur. Il peut contenir à la fois :
-
-```text
-hello",
-```
-
-Cela signifie « fin de la valeur `hello`, fermeture de la chaîne, puis virgule ».
-
-L’ancien code arrêtait la génération dès qu’un token contenait un guillemet et perdait le texte qui le précédait. La première correction, trop restrictive, refusait les tokens contenant de la ponctuation après le guillemet. Le test avec Qwen a montré que cette restriction pouvait bloquer la fin d’une chaîne.
-
-`string_completion()` :
-
-1. cherche une fermeture de chaîne valide ;
-2. sépare le littéral complet et les octets situés après sa fermeture ;
-3. vérifie que ces octets correspondent exactement au début de la ponctuation et de la prochaine clé prévues par le schéma ;
-4. renvoie le littéral et la partie de structure qu’il reste à injecter.
-
-Deux présentations sont autorisées entre les arguments : une avec espace après la virgule, une sans. Le modèle ne peut pas ajouter une autre clé arbitraire : le suffixe attendu vient de la définition de fonction.
-
-### 6.8 Fonction `decode_parameter(...)`
-
-**Entrées :** contexte modifiable, type voulu, cache de vocabulaire, modèle, suffixe attendu et limite de tokens.
-
-**Sortie :** une valeur Python du bon type.
-
-#### Préparation
-
-Pour une chaîne, le programme injecte le guillemet initial : cette ponctuation est imposée par le schéma, elle n’a pas besoin d’être devinée.
-
-Pour les nombres, le décodeur prépare le séparateur qui permettra de terminer une valeur complète. Il attend que ce caractère de ponctuation corresponde à un seul token, comme dans Qwen.
-
-#### Boucle de génération
-
-À chaque tour :
-
-1. vérifier le préfixe actuel ;
-2. établir les tokens pouvant le prolonger légalement ;
-3. autoriser la fin d’un nombre seulement si celui-ci est complet ;
-4. faire choisir le token avec `choose_token()` ;
-5. ajouter le token choisi au contexte ;
-6. si le littéral est terminé, le convertir et compléter uniquement la structure manquante.
-
-Les chaînes ordinaires utilisent un groupe de candidats précalculé lorsque le contexte n’est pas au milieu d’un échappement ou d’une séquence UTF-8. Les tokens particuliers sont analysés plus finement.
-
-Pour les tokens fusionnant texte, guillemet et séparateur, la fonction utilise `string_completion()` : elle conserve le vrai token choisi et n’injecte ensuite que le suffixe restant. Elle ne duplique donc pas la virgule.
-
-#### Limite de génération
-
-La limite actuelle est de 256 tokens par valeur. Si la valeur ne peut pas se terminer à temps, une erreur est produite. Le programme ne prétend pas qu’un texte coupé est un argument complet.
-
-Pour un nombre, atteindre la limite sans avoir choisi de séparateur provoque aussi une erreur. Un préfixe complet ne prouve pas que le modèle avait fini ce nombre.
-
-### 6.9 Fonction `parse_scalar(data, kind)`
-
-Elle transforme un littéral JSON complet en valeur Python avec `json.loads()`.
-
-- `number` devient un `float`, vérifié fini avec `math.isfinite()` ;
-- `boolean` devient un vrai `bool` ;
-- `string` devient une vraie chaîne, avec ses échappements décodés.
-
-L’ancienne conversion retournait parfois `0.0` lorsque le texte était invalide. Cette valeur de secours silencieuse a été supprimée : elle pouvait masquer un échec d’extraction.
-
-Attention aux limites des flottants : tous les très grands entiers ne sont pas représentables exactement dans un `float`. C’est une limite numérique réelle, distincte de la validité syntaxique du JSON.
-
-### 6.10 Fonction `extract_all_parameters(...)`
-
-**Entrées :** définition choisie, contexte contenant l’accolade d’ouverture des paramètres, vocabulaire et modèle.
-
-**Sortie :** dictionnaire contenant tous les arguments déclarés.
-
-La fonction injecte d’abord la première clé. Pour chaque valeur, elle calcule le suffixe qui doit suivre :
-
-```text
-, "prochain_argument":
-```
-
-ou l’accolade finale `}` si c’est le dernier argument.
-
-Elle appelle ensuite `decode_parameter()` pour le type de l’argument. Le décodeur génère la valeur et complète ce suffixe ; le prochain tour commence donc déjà après la clé suivante.
-
-Une fonction sans paramètre produit `{}` : aucune valeur n’est inventée.
-
-La fonction ne reconnaît pas les noms `a`, `b`, `s` ou `name` en dur. Elle utilise les noms et types du fichier de définitions, ce qui permet de changer les fonctions lors de l’évaluation.
-
-## 7. `src/__main__.py` — exécution et fichiers
-
-### 7.1 Fonction `parse_args()`
-
-Elle utilise `argparse` pour lire :
-
-| Option | Valeur par défaut |
+| Option | Chemin par défaut |
 |---|---|
 | `--functions_definition` | `data/input/functions_definition.json` |
 | `--input` | `data/input/function_calling_tests.json` |
 | `--output` | `data/output/function_calls.json` |
 
-Elle renvoie un `Namespace` contenant ces trois chemins. `--help` affiche les options et leurs descriptions.
+`--help` affiche leur usage. La fonction retourne un `Namespace` contenant ces
+chemins.
 
-### 7.2 Fonction `write_results(path, results)`
+### 7.2 `write_results(path, results)`
 
-**Entrées :** chemin de sortie et liste complète des appels validés.
+Crée le dossier parent si nécessaire, ouvre la sortie en UTF-8 avec `with`,
+puis écrit le tableau par `json.dump()`.
 
-Elle crée le dossier parent s’il n’existe pas. Elle écrit ensuite dans un fichier temporaire situé dans le même dossier que la destination.
+- `indent=2` rend le résultat lisible ;
+- `ensure_ascii=False` conserve les caractères Unicode ordinaires ;
+- `allow_nan=False` interdit NaN et les infinis dans le JSON final.
 
-`json.dump()` est configuré avec :
+Le fichier est fermé automatiquement. Il n’y a plus de fichier temporaire ni
+de remplacement atomique. Si une écriture échoue, l’erreur remonte à `main()` ;
+cette version simple ne garantit pas la conservation du précédent fichier
+pendant une panne d’écriture.
 
-- `indent=2`, pour une sortie lisible ;
-- `ensure_ascii=False`, pour écrire les caractères Unicode normalement ;
-- `allow_nan=False`, pour refuser `NaN` et les infinis, que Python peut sinon sérialiser malgré leur non-conformité au JSON standard.
+### 7.3 `main()`
 
-Quand l’écriture réussit, le temporaire remplace la destination. C’est une écriture atomique dans le même système de fichiers : un échec de sérialisation ne détruit pas le précédent résultat.
+Suit le pipeline dans cet ordre :
 
-Le bloc `finally` supprime un éventuel temporaire restant. Il ne supprime pas le résultat précédent lorsque l’écriture échoue.
+1. lire les chemins ;
+2. refuser que la sortie écrase l’un des fichiers d’entrée ;
+3. charger les définitions et les questions avec le parseur ;
+4. écrire `[]` sans modèle si les questions sont vides ;
+5. charger Qwen une fois ;
+6. lire et décoder le vocabulaire via le SDK ;
+7. choisir une fonction pour chaque question ;
+8. ajouter le début de l’objet `parameters` ;
+9. extraire les arguments ;
+10. appeler `validate_call()` pour les clés et types exacts ;
+11. écrire les appels complets dans l’ordre initial.
 
-### 7.3 Fonction `main()`
+Les erreurs sont interceptées au niveau principal et affichées sur `stderr`
+avec `Error: ...`. Le programme sort avec un code non nul. Aucun appel inventé
+n’est ajouté pour masquer un échec.
 
-Elle orchestre le programme :
+Le chronométrage et les messages de progression ont été retirés de cette version
+pour alléger le programme. Le temps de vérification est mesuré de l’extérieur.
 
-1. lire les arguments ;
-2. interdire une sortie qui écraserait l’un des fichiers d’entrée ;
-3. démarrer le chronomètre ;
-4. charger et valider les définitions ;
-5. charger et valider les demandes ;
-6. écrire `[]` immédiatement si les demandes sont vides ;
-7. charger le modèle une fois ;
-8. lire son vocabulaire public et le préparer ;
-9. sélectionner une fonction pour chaque demande ;
-10. injecter la structure de l’objet `parameters` ;
-11. extraire les valeurs ;
-12. valider les clés et les types ;
-13. ajouter l’appel à la liste ;
-14. écrire le fichier complet quand toutes les demandes ont réussi.
+Le bloc `if __name__ == '__main__'` appelle `main()` lorsque le module est lancé
+avec `python -m src`, pas quand il est importé.
 
-Les messages de progression vont sur `stderr`. Ils ne deviennent pas du texte parasite dans le fichier JSON.
+## 8. Le SDK fourni
 
-Une exception est interceptée au niveau principal, affichée sous forme de message `Error: ...`, puis le programme sort avec un code non nul. Il ne masque pas une erreur en écrivant un faux appel.
+L’application appelle seulement son API publique. Torch, Transformers et
+Hugging Face restent à l’intérieur du SDK, comme prévu par le sujet.
+La classe d’origine `Small_LLM_Model` reste le wrapper fourni ; les classes
+métier de `parser.py` utilisent Pydantic.
 
-**Conséquence volontaire :** si une demande échoue, le lot n’est pas annoncé comme réussi et aucun nouveau résultat partiel ne remplace la destination.
+### `Small_LLM_Model.__init__(...)`
 
-### 7.4 Le bloc `if __name__ == '__main__'`
+Charge le tokenizer et les poids de `Qwen/Qwen3-0.6B` par défaut. Le SDK conserve
+ses paramètres d’origine de nom de modèle, périphérique et précision. L’application
+n’ajoute pas d’option de choix de modèle ni de fonctionnalité multi-modèles.
 
-Il appelle `main()` lorsque le module est exécuté avec `python -m src`. Il évite un lancement automatique lorsque ce fichier est importé pour tester `write_results()`.
+Le SDK sélectionne MPS, sinon CUDA, sinon CPU, place le modèle sur le périphérique
+et le met en mode évaluation. Les gradients des paramètres sont désactivés.
+Les `cast` de typage servent à décrire les méthodes décorées de Transformers à
+mypy ; ils ne convertissent pas les poids.
 
-## 8. Le SDK, méthode par méthode
+### `encode(text)`
 
-Le SDK est le composant fourni qui contient Torch, Transformers et l’accès au cache de modèles. L’application `src` n’importe pas ces bibliothèques directement et ne consulte pas les attributs privés du SDK.
+Convertit le texte en identifiants avec le tokenizer fourni et retourne un
+tenseur contenant une séquence : `[[id_1, id_2, ...]]`.
+L’application obtient la liste avec `.tolist()[0]`.
 
-La classe d’origine `Small_LLM_Model` reste le wrapper fourni. Les modèles métier ajoutés à l’application utilisent Pydantic.
+### `decode(ids)`
 
-### 8.1 `Small_LLM_Model.__init__(...)`
+Convertit une liste d’identifiants ou un tenseur en texte, en ignorant les
+marqueurs spéciaux à l’affichage. Cette méthode est utilisée directement pour
+préparer le dictionnaire des tokens. Aucun `decode` maison n’est implémenté.
 
-Paramètres importants :
+### `get_logits_from_input_ids(input_ids)`
 
-- `model_name` : `Qwen/Qwen3-0.6B` par défaut ;
-- `device` : périphérique explicitement demandé, sinon sélection automatique ;
-- `dtype` : précision numérique, déterminée par le périphérique par défaut ;
-- `trust_remote_code` : option conservée de l’interface fournie.
+Transforme le contexte complet en tenseur, appelle le modèle sans gradients et
+renvoie les scores de la dernière position pour le prochain token.
 
-Le SDK choisit MPS si disponible, sinon CUDA, sinon CPU. Il charge le tokenizer et les poids, choisit un token de remplissage si nécessaire, déplace le modèle sur le périphérique et active le mode évaluation.
+L’appel utilise `use_cache=False`. Les anciens attributs `_cached_ids` et
+`_past_key_values`, ainsi que la comparaison de préfixes pour réutiliser le
+cache, ont été supprimés. Chaque demande de logits recalcule son contexte.
 
-Les gradients sont désactivés sur les paramètres : le projet réalise de l’inférence, pas de l’entraînement.
+### `get_path_to_vocab_file()`
 
-Deux champs internes préparent le cache d’inférence : les identifiants déjà calculés et les clés/valeurs d’attention correspondantes. Ils restent internes au SDK.
+Renvoie le chemin du vocabulaire JSON, téléchargé ou déjà présent dans le cache
+standard de fichiers Hugging Face. Ce cache de téléchargement appartient au SDK
+fourni ; il est distinct du cache d’inférence bonus retiré.
 
-Des annotations et conversions `cast` corrigent le décalage entre les types annoncés par les décorateurs de Transformers et leurs méthodes réellement appelables. `cast` n’effectue pas une conversion des poids : c’est une indication pour l’analyse statique.
+### `get_path_to_merges_file()`
 
-### 8.2 `encode(text)`
+Renvoie le fichier des fusions du tokenizer. La méthode reste fournie par le SDK,
+mais l’application ne l’utilise pas pour reconstruire un tokenizer.
 
-Elle transforme du texte en identifiants, puis renvoie un tenseur à deux dimensions, de forme conceptuelle :
+### `get_path_to_tokenizer_file()`
 
-```text
-[[id_1, id_2, id_3]]
-```
+Renvoie la configuration du tokenizer. Cette méthode fournie est également
+conservée, sans être utilisée pour ajouter une autre implémentation de tokenizer.
 
-Le premier niveau représente une série de taille un. C’est pourquoi le code utilise `.tolist()[0]` pour obtenir la simple liste des identifiants.
+## 9. Les commandes et l’environnement
 
-`add_special_tokens=False` signifie que les marqueurs de conversation sont ajoutés explicitement par le contexte, et non implicitement par cette méthode.
-
-### 8.3 `decode(ids)`
-
-Elle transforme des identifiants en texte. Elle accepte une liste d’identifiants ou un tenseur et ignore les tokens spéciaux à l’affichage.
-
-Dans les anciennes expériences, un identifiant isolé était parfois passé directement. Les appels actifs concernés utilisent maintenant une liste : `decode([token_id])`.
-
-Le décodeur principal des arguments utilise les octets du vocabulaire pour respecter les frontières JSON et UTF-8 ; il ne dépend donc pas d’un décodage isolé pouvant perdre des octets répartis entre tokens.
-
-### 8.4 `get_logits_from_input_ids(input_ids)`
-
-**Entrée :** liste des tokens du contexte.
-
-**Sortie :** liste de scores pour le prochain token, une valeur par identifiant du vocabulaire.
-
-La méthode appelle le modèle sans calcul de gradients et récupère les scores à la dernière position de la séquence.
-
-#### Correction de performance : cache d’attention
-
-Avant, chaque appel recalculait tout le contexte : une question et ses définitions pouvaient représenter des centaines de tokens, répétés à chaque nouvelle valeur générée.
-
-Maintenant :
-
-1. le premier appel calcule le contexte entier ;
-2. si le contexte suivant commence exactement par les identifiants déjà calculés et ajoute de nouveaux tokens, le SDK ne calcule que le suffixe ajouté ;
-3. les clés/valeurs d’attention précédentes sont transmises au modèle ;
-4. si le contexte n’est pas une extension du précédent, le cache est abandonné et le calcul repart du contexte complet.
-
-La comparaison porte sur les identifiants, pas sur le nombre de caractères. Une copie des identifiants est mémorisée pour ne pas dépendre des mutations ultérieures de la liste du programme.
-
-Cette optimisation ne choisit pas les fonctions à la place du modèle. Elle évite de refaire un calcul déjà effectué. L’interface publique reste la même et le code de l’application n’accède pas au cache privé.
-
-### 8.5 `get_path_to_vocab_file()`
-
-Elle obtient le chemin du fichier qui associe les symboles de tokens à leurs identifiants. Elle utilise le cache Hugging Face ou télécharge le fichier si nécessaire.
-
-Le programme principal ouvre ce chemin avec `json.load()` puis appelle `build_vocabulary()`.
-
-### 8.6 `get_path_to_merges_file()`
-
-Elle renvoie le fichier de fusions du tokenizer BPE. Une fusion décrit comment des morceaux de texte peuvent être regroupés en tokens.
-
-Cette méthode reste disponible dans le SDK, mais le pipeline principal n’en a pas besoin : il utilise la méthode publique `encode()` pour tokeniser ses textes.
-
-### 8.7 `get_path_to_tokenizer_file()`
-
-Elle renvoie le fichier de configuration complet du tokenizer. Elle est conservée comme méthode publique du SDK, même si le pipeline principal ne l’appelle pas.
-
-## 9. Les fichiers de données
-
-### `functions_definition.json`
-
-Ce fichier décrit les outils disponibles. Il ne contient pas les implémentations Python à exécuter.
-
-Correction concrète dans `fn_greet` :
-
-```diff
-- "typel):e": "string"
-+ "type": "string"
-```
-
-La faute empêchait Pydantic de trouver le champ obligatoire `type`. Le programme refusait donc les définitions avant même de charger le modèle.
-
-### `function_calling_tests.json`
-
-Il contient 11 questions de démonstration : additions, salutations, chaînes à inverser, racines carrées et remplacements par expressions régulières.
-
-La question de racine carrée doit produire l’argument d’entrée, par exemple `16`, et non sa racine `4`. De même, la question d’inversion demande l’argument `hello`, pas le résultat `olleh`.
-
-### `function_calls.json`
-
-C’est un tableau contenant un objet par question. Chaque objet possède exactement `prompt`, `name` et `parameters`.
-
-Il est généré par le programme et exclu de Git. Les sorties de vérification de cette intervention sont conservées séparément pour ne pas versionner des résultats générés.
-
-## 10. Installation, lint et nettoyage
-
-### `pyproject.toml`
-
-Il rend le projet installable depuis sa racine. Le correcteur peut lancer `uv sync` sans deviner où sont les dépendances.
-
-- `llm-sdk` vient du dossier local `llm_sdk`, en installation éditable ;
-- `numpy` sert à manipuler les tableaux de logits ;
-- `pydantic` valide les schémas ;
-- `flake8` et `mypy` appartiennent au groupe de développement, installé par défaut par `uv sync`.
-
-L’installation du paquet SDK expose son nom normal `llm_sdk`. Les imports de l’application sont donc devenus :
-
-```python
-from llm_sdk import Small_LLM_Model
-```
-
-L’ancien chemin `llm_sdk.llm_sdk` dépendait de l’arborescence locale non installée. Il provoquait aussi une détection du même fichier sous deux noms par mypy.
-
-### `uv.lock`
-
-Il verrouille les versions résolues, leurs dépendances et les distributions nécessaires selon la plateforme et la version de Python. Il ne faut pas le modifier manuellement comme un fichier de code.
-
-L’environnement local a été synchronisé avec ce nouveau verrou. La résolution initiale a installé les versions compatibles du SDK et de ses dépendances.
-
-### `.flake8`
-
-La limite de ligne reste de 79 caractères. Le fichier exclut `.venv`, les caches et les métadonnées Git. Il n’exclut pas le SDK ni les tests.
-
-Exclure l’environnement virtuel évite de demander à Flake8 de corriger les milliers de fichiers des dépendances installées.
-
-### `makefile`
-
-| Commande | Action |
-|---|---|
-| `make install` | `uv sync` depuis la racine. |
-| `make run` | `uv run python -m src`. |
-| `make debug` | Même application sous le débogueur `pdb`. |
-| `make lint` | Flake8 sur `.` puis mypy sur `.` avec les options du sujet. |
-| `make lint-strict` | Flake8 sur `.` puis `mypy . --strict`. |
-| `make test` | Découverte des tests `test_*.py`. |
-| `make clean` | Supprime les caches du projet et la sortie générée, en épargnant les environnements et `.git`. |
-
-La commande mypy obligatoire conserve :
-
-```text
---warn-return-any
---warn-unused-ignores
---ignore-missing-imports
---disallow-untyped-defs
---check-untyped-defs
-```
-
-L’option `--follow-imports=silent` a été retirée. Le périmètre `src` a été remplacé par `.`. Les problèmes du SDK et des expériences Python ne sont donc plus cachés pour obtenir un résultat vert.
-
-### `.gitignore` et fichiers compilés
-
-Les fichiers `.pyc` sont des résultats de compilation de Python, pas des sources à rendre. Deux caches du SDK étaient déjà suivis par Git : ils ont été retirés de l’index, tout en laissant leurs éventuelles copies locales utilisables.
-
-Cette suppression de suivi est préparée dans l’index Git. Aucun commit ni push n’a été effectué. Les autres modifications qui existaient dans ton dépôt ont été conservées.
-
-## 11. Les tests, fonction par fonction
-
-Les classes de tests héritent de `unittest.TestCase`. Elles servent au lanceur de tests ; ce ne sont pas des classes métier de l’application.
-
-### 11.1 `test/test_validation.py`
-
-La classe `ValidationTests` regroupe :
-
-| Méthode | Ce qu’elle vérifie |
-|---|---|
-| `definition(kind)` | Prépare une définition indépendante, modifiable selon le type à tester. |
-| `test_unknown_parameter_type_is_rejected()` | Un type mal orthographié ne devient pas implicitement une chaîne. |
-| `test_extra_schema_fields_are_rejected()` | Les champs inattendus d’une définition sont rejetés. |
-| `test_bundled_definitions_load()` | Les cinq définitions fournies sont réellement chargeables. |
-| `test_output_requires_exact_keys()` | Un argument manquant ou une clé supplémentaire provoque une erreur. |
-| `test_output_types_and_finite_numbers()` | Refuse texte, booléen, infini et NaN pour un argument numérique ; accepte un vrai nombre. |
-
-Les premiers tests ont été exécutés avant les corrections : ils montraient le rejet du fichier fourni et l’absence de contrôles sur les champs supplémentaires et les types inconnus.
-
-### 11.2 `test/test_decoding.py`
-
-`ArrayResult` imite uniquement le résultat public de `.tolist()` pour éviter de charger un modèle dans un test déterministe.
-
-`ScriptedModel` fournit des scores contrôlés. Sa méthode `encode()` utilise le petit vocabulaire du test. Sa méthode `get_logits_from_input_ids()` mémorise le contexte et donne le score maximal au prochain token prévu.
-
-Ces objets de test utilisent Pydantic. Ils ne cherchent pas à reproduire la qualité de Qwen : ils permettent de provoquer précisément une frontière ou un token dangereux.
-
-La classe `DecodingTests` vérifie :
-
-| Méthode | But |
-|---|---|
-| `test_invalid_number_prefixes()` | Refuser signes répétés, zéros initiaux interdits, double point et exposant mal formé. |
-| `test_complete_numbers_and_incomplete_prefixes()` | Distinguer nombre complet et préfixe qui exige encore un chiffre. |
-| `test_quotes_and_escapes()` | Accepter Unicode et échappements légaux ; rejeter les séquences invalides. |
-| `test_boolean_literals()` | Vérifier la grammaire de `true` et `false`. |
-| `test_multi_character_token_before_quote_is_preserved()` | Conserver le texte d’un token contenant aussi son guillemet final. |
-| `test_generation_limit_raises()` | Refuser de retourner une chaîne silencieusement tronquée. |
-| `test_non_finite_numbers_are_masked()` | Écarter un exposant produisant un infini. |
-| `test_prefix_function_name_can_finish()` | Permettre de choisir `fn` même si `fn_long` existe. |
-| `test_boolean_generation()` | Générer réellement un booléen en suivant les scores autorisés. |
-| `test_quote_and_comma_in_one_token()` | Accepter un token qui ferme une chaîne et émet sa virgule. |
-| `test_number_generation_with_exponent()` | Générer un flottant négatif avec décimale et exposant, puis injecter son séparateur. |
-| `test_merged_token_can_start_next_argument_key()` | Conserver un token qui contient déjà la virgule et le début de la clé suivante, sans les dupliquer. |
-
-Le dernier test a d’abord échoué, puis a réussi après l’ajout de `string_completion()`.
-
-### 11.3 `test/test_cli.py`
-
-La classe `FileAndCliTests` utilise des dossiers temporaires pour ne pas modifier les données du projet.
-
-| Méthode | But |
-|---|---|
-| `test_missing_and_malformed_input()` | Tester fichier absent, JSON cassé et mauvaise forme racine. |
-| `test_empty_and_duplicate_definitions()` | Refuser un ensemble vide de fonctions et les noms dupliqués. |
-| `test_empty_prompts_write_empty_array()` | Lancer la vraie commande avec une entrée vide et vérifier `[]`. |
-| `test_failure_preserves_previous_output()` | Vérifier qu’une erreur de sérialisation conserve l’ancien fichier et nettoie le temporaire. |
-| `test_cli_errors_are_clear()` | Vérifier un code de sortie non nul et un message sans traceback non géré. |
-
-Ces tests lancent parfois un sous-processus Python, mais pas d’inférence de modèle : leurs entrées provoquent une sortie avant cette étape.
-
-### 11.4 Expériences historiques
-
-`test/test.py` contient `speak_with_llm(prompt)` : lecture de logits et démonstration de masquage d’un token. Les identifiants passés à `decode()` ont été remis sous forme de listes et l’accès à un logit utilise maintenant l’identifiant du caractère obtenu depuis le vocabulaire.
-
-`test/tests.py` contient un autre `speak_with_llm(prompt)` : chargement du vocabulaire et affichage des identifiants de quelques caractères JSON.
-
-`test/testz.py` contient `tchat_llm(prompt)` : boucle de génération libre arrêtée sur les tokens de fin. Ce n’est pas le décodeur contraint de l’application.
-
-Ces trois fichiers ont été conservés, typés et placés derrière un bloc `if __name__ == '__main__'`. Les importer ne lance plus automatiquement une expérience coûteuse. Ils ne constituent pas la suite de régression découverte par `make test`.
-
-## 12. Tableau des corrections : avant et après
-
-| Avant | Maintenant | Pourquoi |
-|---|---|---|
-| Faute `typel):e` dans les données | Champ `type` corrigé | Le fichier de démonstration doit charger. |
-| `type: str` acceptait tous les textes | Types scalaires limités explicitement | Éviter les schémas inconnus. |
-| Champs supplémentaires ignorés | `extra='forbid'` | Signaler les fautes au lieu de les masquer. |
-| Noms de fonctions dupliqués possibles | Doublons rejetés | Éviter une sélection ambiguë. |
-| Filtre numérique par caractères | Grammaire à états | Garantir un ordre syntaxiquement correct. |
-| Conversion invalide remplacée par zéro | Erreur explicite | Ne pas inventer un argument. |
-| Chaînes coupées dès qu’un token contient `"` | Vérification de la fermeture et des échappements | Préserver le texte avant le guillemet. |
-| Ponctuation fusionnée au token refusée | Suffixe de structure vérifié et complété | Permettre les vrais tokens de Qwen. |
-| `.strip()` sur les chaînes | Espaces conservés | Ne pas modifier les arguments. |
-| Limite pouvant tronquer une valeur | Erreur si la valeur ne se termine pas | Distinguer échec et résultat complet. |
-| `Dict[str, Any]` sans contrôle métier | Clés et types validés par fonction | Respecter le schéma réel. |
-| JSON Python pouvait accepter NaN/infini | Nombres finis et `allow_nan=False` | Produire un JSON standard. |
-| Nom court forcé vers un nom plus long | Branches incluant les guillemets | Gérer les préfixes communs. |
-| Imports dépendant du dossier non installé | Import du paquet `llm_sdk` installé | Fonctionner après `uv sync`. |
-| Pas de configuration racine | `pyproject.toml` et `uv.lock` | Installation reproductible. |
-| Lint limité à `src` et imports silencieux | Analyse de `.` sans cette suppression | Respecter le périmètre du sujet. |
-| Scripts manuels exécutés à l’import | Lancement explicite uniquement | Garder des tests utilisables. |
-| Réécriture directe du fichier final | Fichier temporaire puis remplacement | Éviter une sortie détruite à mi-écriture. |
-| Recalcul du contexte à chaque token | Réutilisation du cache d’attention | Réduire le temps d’inférence. |
-| Caches `.pyc` suivis | Retrait du suivi et exclusions | Rendre des sources plutôt que des artefacts locaux. |
-| Documentation absente | README anglais et guide français | Préparer usage et compréhension. |
-
-Les anciennes fonctions `get_numeric_token_ids`, `decode_number_parameter`, `decode_string_parameter` et `decode_boolean_parameter` ont été remplacées par le vocabulaire préparé, les grammaires spécialisées et `decode_parameter()`. L’objectif est de partager la même boucle de sélection tout en gardant des règles différentes selon le type.
-
-## 13. Vérification et limites à connaître
-
-Vérifications exécutées après les corrections :
-
-| Vérification | Résultat observé |
-|---|---|
-| `uv sync --locked` | Réussite ; le verrou et l’environnement sont cohérents. |
-| `make test` | 22 tests réussis. |
-| `make lint` | Flake8 et mypy réussis sur les 13 fichiers Python. |
-| `make lint-strict` | Flake8 et mypy strict réussis sur les 13 fichiers Python. |
-| Commande réelle avec Qwen | Code de sortie 0 ; 11 appels produits. |
-| Validation indépendante du fichier produit | 11 objets avec les clés attendues et les types conformes aux définitions. |
-| Noms de fonctions | 11 bons choix sur 11. |
-| Appels complets, arguments inclus | 10 sur 11, soit 90,91 %. |
-| Temps du pipeline | 57,9 secondes, y compris le chargement des poids déjà en cache, hors import initial des dépendances. |
-| Cache d’inférence | Logits calculés avec cache et après réinitialisation cohérents à la tolérance numérique `1e-4` ; même meilleur token, écart absolu maximal observé `0,00002861`. |
-
-La vérification Qwen a été lancée en mode hors ligne pour utiliser le modèle déjà présent dans le cache. Le programme reste utilisable normalement avec accès au téléchargement lors d’une première installation.
-
-### Résultats des 11 exemples
-
-| Question | Fonction et arguments |
-|---|---|
-| Addition de 2 et 3 | Corrects : `a=2.0`, `b=3.0`. |
-| Addition de 265 et 345 | Corrects : `a=265.0`, `b=345.0`. |
-| Saluer shrek | Corrects : `name="shrek"`. |
-| Saluer john | Corrects : `name="john"`. |
-| Inverser hello | Corrects : argument `s="hello"`. |
-| Inverser world | Corrects : argument `s="world"`. |
-| Racine de 16 | Corrects : argument `a=16.0`, pas le résultat 4. |
-| Racine de 144 | Corrects : argument `a=144.0`, pas le résultat 12. |
-| Remplacer les nombres | Corrects : motif `([0-9]+)`, remplacement `NUMBERS`. |
-| Remplacer les voyelles | Fonction correcte, texte et motif corrects ; remplacement `**` au lieu de `*`. |
-| Remplacer cat par dog | Corrects. |
-
-Pour les expressions régulières, la comparaison accepte des écritures différentes qui donnent le comportement attendu sur la chaîne fournie. Elle vérifie aussi la chaîne source et le texte de remplacement. Elle ne constitue pas une preuve que deux motifs sont équivalents pour toutes les chaînes possibles.
-
-Le remplacement `**` est une erreur sémantique réelle : le JSON reste valide et bien typé, mais chaque voyelle est remplacée par deux astérisques au lieu d’un. Ce cas est donc compté incorrect. Aucune règle spéciale n’a été ajoutée pour remplacer artificiellement cette réponse dans les exemples.
-
-Les seuils de 90 % et de cinq minutes sont atteints sur ce lot local. Ils ne suffisent pas à garantir le résultat sur les données inconnues du correcteur.
-
-Les tests déterministes ne mesurent pas la compréhension du LLM. Le test réel doit contrôler le nom choisi et les arguments, pas uniquement la possibilité de relire le JSON.
-
-Les expressions régulières peuvent avoir plusieurs écritures valides pour la même demande. Il faut alors examiner leur comportement, et pas seulement comparer les caractères des deux motifs.
-
-Le sujet annonce 90 % ou plus de bonnes sélections et extractions, et moins de cinq minutes pour le lot sur une machine standard. Une mesure sur les exemples fournis ne garantit pas le même résultat sur toutes les demandes inconnues.
-
-Limites explicites :
-
-- tokenizer ciblé : Qwen ByteLevel ;
-- arguments scalaires seulement ;
-- nombres représentés en flottants finis ;
-- limite de 256 tokens par argument ;
-- une erreur interrompt le lot avec un message, au lieu d’inventer un résultat ;
-- premier téléchargement des poids nécessaire si le modèle n’est pas déjà en cache.
-
-## 14. Comment vérifier ta compréhension
-
-Refais le chemin de la question « What is the sum of 2 and 3? » à voix haute :
-
-1. Qui lit le fichier et vérifie sa forme ?
-2. Qui connaît les fonctions disponibles ?
-3. Quel composant produit les scores ?
-4. Pourquoi un token interdit ne peut-il pas être sélectionné ?
-5. Qui impose les clés `a` et `b` ?
-6. Pourquoi `-` n’autorise-t-il pas encore la fin du nombre ?
-7. À quel moment `2` devient-il `2.0` ?
-8. Qui vérifie que `True` n’est pas accepté comme nombre ?
-9. Pourquoi écrit-on dans un temporaire avant de remplacer la sortie ?
-10. Quelle différence reste-t-il entre un appel bien formé et un appel correct ?
-
-Pour expérimenter, change les noms des fonctions et des paramètres dans une copie de leurs définitions, ajoute une fonction sans argument, puis utilise les options de chemins pour lancer le programme sur ces copies. Cela permet de vérifier que l’algorithme dépend bien du schéma fourni.
-
-Commandes à connaître :
+`pyproject.toml` déclare le SDK local, NumPy et Pydantic. Les outils de développement
+sont Flake8 et mypy. `uv.lock` fixe les versions résolues. `.venv` contient leur
+installation locale.
 
 ```sh
 uv sync
-uv run python -m src --help
-make test
-make lint
-make lint-strict
 uv run python -m src
 ```
 
-`make debug` permet ensuite de suivre l’exécution dans `pdb`. Des points d’arrêt dans `select_valid_function()`, `decode_parameter()` et `validate_call()` montrent respectivement la sélection, la génération et le contrôle final.
+`uv sync` prépare l’environnement mais ne l’active pas dans le terminal.
+`uv run` l’utilise pour la commande, même sans activation manuelle.
 
+| Commande Make | Rôle |
+|---|---|
+| `make install` | Installer avec `uv sync`. |
+| `make run` | Lancer l’application via `uv run python -m src`. |
+| `make debug` | Lancer le même module sous `pdb`. |
+| `make lint` | Exécuter Flake8 et les options mypy exigées sur `.`. |
+| `make lint-strict` | Exécuter Flake8 puis `mypy . --strict`. |
+| `make clean` | Supprimer caches de projet et sortie générée, sans supprimer `.venv` ni `.git`. |
 
-## 15. Correction du 9 novembre : mypy et le SDK installé en mode éditable
+`make lintr` est une faute de frappe. Il n’existe pas de cible `make test` dans
+le Makefile actuel. Les anciens résultats de 22 tests d’une autre version ne
+sont donc plus présentés comme la vérification de ce code.
 
-Le projet est maintenant dans `Cercle_3/call_me`. Python charge correctement
-`llm_sdk/llm_sdk/__init__.py` après `uv sync`. Cependant, lors de `mypy src`,
-l’analyseur pouvait interpréter le dossier extérieur `llm_sdk` comme un paquet
-namespace, sans y trouver `Small_LLM_Model`. Cela explique pourquoi le programme
-s’exécutait alors que la vérification de types échouait.
-
-La configuration racine indique désormais explicitement le chemin des sources :
+Le chemin mypy du SDK reste configuré :
 
 ```toml
 [tool.mypy]
 mypy_path = "$MYPY_CONFIG_FILE_DIR/llm_sdk"
 ```
 
-Le chemin part du dossier de `pyproject.toml`, et non du répertoire personnel ou
-d’un nom de projet fixé en dur. La correction reste donc valable si le dépôt est
-renommé ou déplacé. Elle ne masque aucune erreur de type et ne modifie pas
-l’import utilisé par Python.
+Il évite de confondre le dossier extérieur du SDK avec son paquet Python lors
+d’une vérification ciblée de `src`. Les imports restent
+`from llm_sdk import Small_LLM_Model`.
 
-La bonne commande Make est `make lint`. `make lintr` demande une cible inexistante.
-Le message `Cannot read ... introuvable.json` est le comportement attendu quand
-on teste volontairement un fichier absent : le programme signale l’erreur et
-termine avec un code non nul, sans traceback non géré. L’avertissement HF_TOKEN
-vu dans la capture n’a pas empêché les deux lots de s’exécuter.
+## 10. Les expériences manuelles conservées
+
+Aucune suite de tests complète nouvelle n’est ajoutée au rendu. Le dossier
+`test/` contient les expériences qui existaient déjà :
+
+- `test/test.py` : `speak_with_llm(prompt)` affiche des identifiants et logits,
+  puis illustre un masquage de token. Ce n’est pas le pipeline à rendre.
+- `test/tests.py` : `speak_with_llm(prompt)` affiche les identifiants de caractères
+  JSON trouvés dans le vocabulaire.
+- `test/testz.py` : `tchat_llm(prompt)` réalise une génération libre, arrêtée sur
+  les tokens de fin. Elle ne garantit pas un appel JSON structuré.
+- `test/__init__.py` marque le paquet ; il n’ajoute aucune fonctionnalité.
+
+Leurs appels sont protégés par `if __name__ == '__main__'`. Les importer ne
+charge donc pas automatiquement une expérience d’inférence.
+
+Les vérifications ponctuelles réalisées pendant cette intervention sont placées
+hors du dépôt, dans l’espace de travail de cette conversation. Vérifier le
+mandatory ne consiste pas à ajouter un bonus de suite de tests au rendu.
+
+## 11. Ce qui a été simplifié les 12 et 13 novembre
+
+| Avant | Version actuelle |
+|---|---|
+| Cache des clés/valeurs d’attention dans le SDK | Aucun cache d’inférence conservé. |
+| Conversion manuelle des symboles ByteLevel en octets | Appels au `decode()` public du SDK. |
+| Classe `TokenVocabulary` et plusieurs groupes de tokens | Dictionnaire simple `dict[int, str]`. |
+| Machine à états numérique en octets, puis expressions régulières difficiles à lire | `json.loads()` et vérification explicite des préfixes numériques. |
+| Expression régulière pour les chaînes ouvertes | Boucle avec `escaped` et `missing_digits`, puis lecteur JSON pour la chaîne complète. |
+| Fichier temporaire puis remplacement atomique | Écriture directe avec `with` et `json.dump()`. |
+| Chronométrage et progression dans `main()` | Pipeline sans instrumentation intégrée. |
+| Documentation d’une ancienne suite complète | Vérifications actuelles et expériences réellement présentes. |
+
+Les expressions régulières `NUMBER`, `NUMBER_PREFIX` et `STRING_PREFIX` ont
+été supprimées après ta remarque du 13 novembre. Les fonctions de vérification
+utilisent maintenant du Python explicite. Le détail est dans la section 6.
+Les longues docstrings du décodeur ont été remplacées par des descriptions
+courtes ; les explications restent dans ce document.
+
+Les noms de fonctions et valeurs viennent toujours du modèle. Il n’y a pas de
+réponses mémorisées ou de règles de mots-clés pour les exemples du sujet.
+
+## 12. Obligatoire ou bonus ?
+
+| Fonctionnalité | Statut dans cette version |
+|---|---|
+| Qwen3-0.6B par défaut | Obligatoire, conservé. |
+| Choix de fonction par le LLM | Obligatoire, conservé. |
+| Contraintes JSON et types des arguments | Obligatoires, conservées. |
+| Gestion normale des fichiers absents ou JSON malformés | Obligatoire, conservée. |
+| Flake8, mypy, typage et docstrings | Obligatoires, conservés. |
+| Cache d’inférence, batching | Bonus, non ajoutés. |
+| Réécriture du tokenizer et API de tokenizer maison | Bonus, absentes. |
+| Arguments complexes imbriqués | Bonus, absents. |
+| Récupération avancée après erreur | Bonus, absente. |
+| Suite complète ajoutée au rendu | Bonus, absente. |
+| Visualisation de génération | Bonus, absente. |
+
+La gestion des échappements, d’un nombre négatif ou de deux noms partageant un
+préfixe n’est pas un bonus : elle sert à respecter la partie obligatoire sur des
+entrées normales ou des cas limites.
+
+## 13. Vérifications et limites
+
+Le sujet exige un JSON valide et conforme au schéma, au moins 90 % de bons appels
+sur les essais, et moins de cinq minutes pour le lot sur du matériel standard.
+
+Vérification du 13 novembre, après suppression des expressions régulières :
+
+| Contrôle | Résultat |
+|---|---|
+| `make lint` sur tout le projet | Réussi, code de sortie 0 ; 10 fichiers Python vérifiés par mypy. |
+| `make lint-strict` sur tout le projet | Réussi, code de sortie 0 ; 10 fichiers Python vérifiés par mypy. |
+| `uv run mypy src --strict` | Réussi, 5 fichiers. |
+| `uv sync --locked` | Réussi. |
+| Empreintes des deux fichiers protégés | Identiques à celles du début de la simplification. |
+| Vérifications temporaires du décodeur | Nombres invalides, exposants, booléens, échappements, Unicode, espaces, tokens traversant une fermeture et limite de génération : réussies. |
+| Vérifications temporaires de la ligne de commande | 8 cas réussis, dont fichiers absents, JSON malformé, entrées vides et protection des fichiers d’entrée. |
+| Lancement réel de Qwen sur les 11 demandes fournies | Sortie 0, 267,29 secondes, soit environ 4 min 27 s. |
+| JSON lisible et conforme au schéma | 11/11. |
+| Bons noms de fonctions | 11/11. |
+| Appels entièrement corrects sur ces 11 demandes | 10/11, soit 90,91 %. |
+
+L’essai utilise le modèle déjà téléchargé ; ce temps ne comprend pas un premier
+téléchargement. Les vérifications de la ligne de commande ont tourné en parallèle
+pendant une partie de ce lancement. Cette durée décrit cette exécution sur cette
+machine ; elle ne garantit pas la même durée sur tout matériel.
+
+**Erreur réelle conservée dans le bilan :** pour remplacer les voyelles de
+`Programming is fun` par des astérisques, Qwen produit un remplacement `" *"`
+avec un espace initial, au lieu de `"*"`. Le JSON est valide, mais l’appel est
+incorrect. La simplification n’a pas résolu cette erreur sémantique du modèle.
+
+Trois demandes supplémentaires ont aussi été exécutées avec d’autres définitions
+de fonctions, en 30,76 secondes. Elles couvrent un nombre négatif, des booléens,
+le texte `café`, une fonction sans argument et une chaîne vide. Les trois sorties
+respectent le schéma ; deux appels sont entièrement corrects. Pour la demande
+exigeant un libellé vide `""`, Qwen produit `" "`, c’est-à-dire un espace.
+
+Sur les deux lots réunis, cela donne donc **12 appels corrects sur 14, soit
+85,71 %**, avec 14/14 sorties conformes au schéma. Le seuil de 90 % est atteint
+sur les seuls exemples fournis, mais pas sur cet ensemble élargi. Il serait
+incorrect de présenter la conformité complète au sujet comme acquise.
+
+Les anciennes mesures de la version avec cache ne décrivent plus ce code.
+
+La validité du schéma ne suffit pas à prouver le sens de la réponse : une valeur
+peut avoir le bon type et être incorrecte. Les expressions régulières proposées
+par le modèle peuvent aussi avoir plusieurs écritures équivalentes sur un exemple ;
+la comparaison doit contrôler leur effet, la chaîne source et le remplacement.
+
+Limites explicites : types `number`, `string`, `boolean` ; flottants finis ;
+256 tokens par valeur ; pas d’objets ni de listes imbriquées ; certains tokens
+Unicode incomplets exclus ; arrêt du lot avec erreur si une valeur ne peut pas
+être terminée. Les résultats obtenus sur les exemples ne garantissent pas la
+même précision sur des demandes inconnues.
+
+## 14. Points à savoir expliquer à l’oral
+
+1. Pourquoi ne retourne-t-on pas la somme de 2 et 3 ?
+2. Quelle différence entre un JSON valide et un appel correct ?
+3. À quoi sert le schéma Pydantic ?
+4. Pourquoi `1.` est-il un préfixe valide, mais pas encore un nombre complet ?
+5. Pourquoi un token contenant `",` doit-il être pris en compte ?
+6. Pourquoi `True` ne doit-il pas être accepté comme nombre ?
+7. Qui choisit une valeur quand plusieurs tokens sont autorisés ?
+8. Pourquoi un token unique imposé par le schéma n’exige-t-il aucun choix ?
+9. Quelle différence entre le cache de téléchargement du modèle et un cache
+   d’inférence ?
+10. Pourquoi utilise-t-on le SDK au lieu d’importer Transformers dans `src` ?
+
+Pour suivre le code : `make debug`, puis des points d’arrêt dans
+`select_valid_function()`, `decode_parameter()` et `validate_call()`.
