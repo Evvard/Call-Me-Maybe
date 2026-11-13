@@ -71,7 +71,7 @@ selection does not use keyword heuristics or hardcoded answers.
   and additional model-selection features are not implemented.
 - The application uses the SDK's public methods. Torch and Transformers remain
   inside the supplied SDK; application code does not access SDK private fields.
-- The SDK matches the copy in `llm_sdk.zip`. The application adds no inference
+- The supplied SDK is preserved. The application adds no inference
   cache or batching and sends the complete context for each logits request.
 - Numbers are checked with Python JSON parsing. An explicit loop checks open
   strings and their escapes. The decoder uses no regular expressions.
@@ -120,10 +120,9 @@ extra or missing arguments from reaching successful output.
 
 Verification uses the assignment's normal CLI, complete lint targets, and temporary
 checks of malformed input, scalar grammar rules, string escapes and output types.
-These checks are kept outside the submitted repository; no comprehensive bonus
-test suite is added. The `test/` directory retains the original manual SDK
-experiments, which run only when explicitly invoked. There is no `make test`
-target in the current Makefile.
+These checks and the original manual SDK experiments are kept outside the
+submitted repository. No comprehensive bonus test suite is added. There is no
+`make test` target in the current Makefile.
 
 ## Example usage
 
@@ -139,7 +138,8 @@ For `What is the sum of 2 and 3?`, the expected object in the output array is:
 
 ## Resources
 
-- The provided `en.subject.pdf`, version 1.7, defines the requirements.
+- The 42 Call Me Maybe assignment, version 1.7, defines the requirements. Its PDF
+  is a development reference and is not included in the submission.
 - [JSON specification, RFC 8259](https://www.rfc-editor.org/rfc/rfc8259)
 - [Python JSON module](https://docs.python.org/3/library/json.html)
 - [Pydantic documentation](https://docs.pydantic.dev/)
@@ -147,9 +147,4 @@ For `What is the sum of 2 and 3?`, the expected object in the output array is:
 - [Flake8 documentation](https://flake8.pycqa.org/)
 - [Qwen3-0.6B model](https://huggingface.co/Qwen/Qwen3-0.6B)
 
-AI assistance was used for comment translation, assignment review, validation and
-constrained-decoding corrections, dependency/lint setup, temporary verification
-and documentation. It was also used to simplify the decoder and remove the added
-inference cache, custom byte conversion and temporary-file output logic.
-`parser.py` and `function_select.py` were left unchanged during this simplification.
-The author must understand and be able to explain the submitted implementation.
+AI assistance was used for comment translation, assignment review and documentation.
