@@ -7,8 +7,8 @@ from typing import Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ParameterValue = Union[str, float, bool]
-ParameterType = Literal['number', 'string', 'boolean']
+ParameterValue = Union[str, float, int, bool]
+ParameterType = Literal['number', 'integer', 'string', 'boolean']
 
 
 class InputDetail(BaseModel):
@@ -123,6 +123,8 @@ def validate_call(
             valid = (isinstance(value, (int, float))
                      and not isinstance(value, bool)
                      and math.isfinite(value))
+        elif detail.type == 'integer':
+            valid = type(value) is int
         elif detail.type == 'boolean':
             valid = type(value) is bool
         else:

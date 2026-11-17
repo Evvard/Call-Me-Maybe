@@ -88,10 +88,24 @@ def main() -> None:
                 item.prompt, functions, model
             )
 
+            selected_func_def = functions_map[chosen_name]
+            system = (
+                'Extract arguments for this function; do not execute it. '
+                'Copy string values exactly, preserving '
+                'punctuation and quotes. '
+                'Infer regex patterns when needed. Function: '
+                + json.dumps(selected_func_def.model_dump(),
+                             ensure_ascii=False)
+            )
+            context = (
+                f'<|im_start|>system\n{system}<|im_end|>\n'
+                f'<|im_start|>user\n{item.prompt}<|im_end|>\n'
+                '<|im_start|>assistant\n{"name": ' + json.dumps(chosen_name)
+            )
+            current_ids = model.encode(context).tolist()[0]
             transition = ', "parameters": {'
             current_ids.extend(model.encode(transition).tolist()[0])
 
-            selected_func_def = functions_map[chosen_name]
             extracted_params = extract_all_parameters(
                 selected_func_def, current_ids, tokens, model
             )

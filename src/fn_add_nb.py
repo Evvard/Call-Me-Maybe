@@ -24,10 +24,12 @@ def build_vocabulary(
     return pieces
 
 
-def complete_number(text: str) -> bool:
-    """Return whether text is a complete, finite JSON number."""
+def complete_number(text: str, kind: ParameterType = 'number') -> bool:
+    """Check a complete JSON number, requiring an int for integer schemas."""
     try:
         value = json.loads(text)
+        if kind == 'integer':
+            return type(value) is int
         return type(value) in (int, float) and math.isfinite(value)
     except (ValueError, OverflowError):
         return False
@@ -35,8 +37,13 @@ def complete_number(text: str) -> bool:
 
 def string_prefix(text: str) -> bool:
     """Check an open JSON string, allowing unfinished escape sequences."""
+    text = text.lstrip(' \t\r\n')
+    if not text:
+        return True
     if not text.startswith('"'):
         return False
+    if text.isprintable() and '"' not in text[1:] and '\\' not in text:
+        return True
     escaped = False
     missing_digits = 0
     for char in text[1:]:
@@ -61,11 +68,14 @@ def valid_prefix(text: str, kind: ParameterType) -> bool:
     """Return whether text can still become a value of the required type."""
     if kind == 'string':
         return string_prefix(text)
-    if kind == 'number':
-        if any(char not in '0123456789.-+eE \t\r\n' for char in text):
+    if kind in ('number', 'integer'):
+        characters = '0123456789- \t\r\n'
+        if kind == 'number':
+            characters += '.+eE'
+        if any(char not in characters for char in text):
             return False
         # A missing digit after -, a decimal point, or e can be completed by 0.
-        return complete_number(text) or complete_number(text + '0')
+        return complete_number(text, kind) or complete_number(text + '0', kind)
     text = text.lstrip(' \t\r\n')
     if text.rstrip(' \t\r\n') in ('true', 'false'):
         return True
@@ -91,6 +101,7 @@ def choose_token(
 
 def string_completion(text: str, suffix: str) -> tuple[str, str] | None:
     """Accept a JSON string followed only by the expected schema syntax."""
+    text = text.lstrip(' \t\r\n')
     try:
         value, end = json.JSONDecoder().raw_decode(text)
         if not isinstance(value, str):
@@ -108,6 +119,8 @@ def string_completion(text: str, suffix: str) -> tuple[str, str] | None:
 def parse_scalar(text: str, kind: ParameterType) -> ParameterValue:
     """Convert a complete literal to its expected scalar Python type."""
     value: Any = json.loads(text)
+    if kind == 'integer' and type(value) is int:
+        return int(value)
     if kind == 'number':
         number = float(value)
         if not math.isfinite(number):
@@ -125,7 +138,7 @@ def decode_parameter(
     model: Small_LLM_Model, suffix: str, max_tokens: int = 256,
 ) -> ParameterValue:
     """Generate one scalar while rejecting illegal next tokens."""
-    text = '"' if kind == 'string' else ''
+    text = ''
     stop = model.encode(suffix[0]).tolist()[0]
     if len(stop) != 1:
         raise ValueError('Expected a single-token JSON delimiter.')
@@ -142,10 +155,10 @@ def decode_parameter(
                 if ending is not None:
                     allowed.append(token_id)
                     endings[token_id] = ending
-        if kind == 'number' and complete_number(text):
+        if kind in ('number', 'integer') and complete_number(text, kind):
             allowed.append(stop[0])
         chosen = choose_token(current_ids, allowed, model)
-        if kind == 'number' and chosen == stop[0]:
+        if kind in ('number', 'integer') and chosen == stop[0]:
             break
         current_ids.append(chosen)
         if chosen in endings:
@@ -172,16 +185,11 @@ def extract_all_parameters(
         current_ids.extend(model.encode('}').tolist()[0])
         return parameters
     first_key = json.dumps(items[0][0]) + ':'
-    if items[0][1].type == 'string':
-        first_key += ' "'
     current_ids.extend(model.encode(first_key).tolist()[0])
     for index, (name, detail) in enumerate(items):
         suffix = '}'
         if index + 1 < len(items):
-            next_name, next_detail = items[index + 1]
-            suffix = ', ' + json.dumps(next_name) + ':'
-            if next_detail.type == 'string':
-                suffix += ' "'
+            suffix = ', ' + json.dumps(items[index + 1][0]) + ':'
         parameters[name] = decode_parameter(
             current_ids, detail.type, pieces, model, suffix
         )
